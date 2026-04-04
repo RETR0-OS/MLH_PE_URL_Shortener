@@ -14,7 +14,9 @@ logger = logging.getLogger(__name__)
 
 # --- Configuration ---
 PROJECT_NAME = os.environ["COMPOSE_PROJECT_NAME"]
-POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", 10))
+POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", 5))
+POLL_INTERVAL_HOT = int(os.environ.get("POLL_INTERVAL_HOT", 3))
+POLL_HOT_CPU = float(os.environ.get("POLL_HOT_CPU", 50))
 COOLDOWN = int(os.environ.get("COOLDOWN", 60))
 SCALE_UP_CPU = float(os.environ.get("SCALE_UP_CPU", 70))
 SCALE_DOWN_CPU = float(os.environ.get("SCALE_DOWN_CPU", 30))
@@ -93,9 +95,9 @@ def reload_nginx(client: docker.DockerClient) -> None:
         logger.info("nginx reloaded successfully.")
 
 
-def poll(client: docker.DockerClient, last_scale_time: float) -> float:
+def poll(client: docker.DockerClient, last_scale_time: float) -> tuple[float, float]:
     """
-    Single poll cycle. Returns the (possibly updated) last_scale_time.
+    Single poll cycle. Returns (last_scale_time, avg_cpu).
     All exceptions are caught so the caller's main loop stays alive.
     """
     try:
@@ -110,7 +112,7 @@ def poll(client: docker.DockerClient, last_scale_time: float) -> float:
 
         if current_replicas == 0:
             logger.warning("No app containers found; skipping cycle.")
-            return last_scale_time
+            return last_scale_time, 0.0
 
         # Collect per-container CPU percentages
         cpu_samples: list[float] = []
@@ -129,22 +131,22 @@ def poll(client: docker.DockerClient, last_scale_time: float) -> float:
 
         if not cpu_samples:
             logger.info(
-                "status | replicas=%d  avg_cpu=n/a (warming up)  cooldown=%s",
+                "status | replicas=%d  avg_cpu=n/a (warming up)  scale_down_cooldown=%s",
                 current_replicas,
                 f"{cooldown_remaining:.0f}s remaining" if in_cooldown else "ready",
             )
-            return last_scale_time
+            return last_scale_time, 0.0
 
         avg_cpu = sum(cpu_samples) / len(cpu_samples)
 
         logger.info(
-            "status | replicas=%d  avg_cpu=%.1f%%  cooldown=%s",
+            "status | replicas=%d  avg_cpu=%.1f%%  scale_down_cooldown=%s",
             current_replicas,
             avg_cpu,
             f"{cooldown_remaining:.0f}s remaining" if in_cooldown else "ready",
         )
 
-        if avg_cpu > SCALE_UP_CPU and current_replicas < MAX_REPLICAS and not in_cooldown:
+        if avg_cpu > SCALE_UP_CPU and current_replicas < MAX_REPLICAS:
             new_replicas = current_replicas + 1
             logger.info(
                 "SCALE UP: %.1f%% > %.1f%% threshold — %d -> %d replicas",
@@ -153,31 +155,31 @@ def poll(client: docker.DockerClient, last_scale_time: float) -> float:
             scale_app(client, new_replicas)
             time.sleep(2)
             reload_nginx(client)
-            return now
+            return now, avg_cpu
 
         if avg_cpu < SCALE_DOWN_CPU and current_replicas > MIN_REPLICAS and not in_cooldown:
             new_replicas = current_replicas - 1
             logger.info(
-                "SCALE DOWN: %.1f%% < %.1f%% threshold — %d -> %d replicas",
+                "SCALE DOWN: %.1f%% < %.1f%% threshold — %d -> %d replicas (cooldown resets)",
                 avg_cpu, SCALE_DOWN_CPU, current_replicas, new_replicas,
             )
             scale_app(client, new_replicas)
             time.sleep(2)
             reload_nginx(client)
-            return now
+            return now, avg_cpu
 
     except Exception as exc:
         logger.error("Unhandled exception in poll cycle: %s", exc, exc_info=True)
 
-    return last_scale_time
+    return last_scale_time, avg_cpu if 'avg_cpu' in dir() else 0.0
 
 
 def main() -> None:
     logger.info(
-        "Autoscaler starting — project=%s  interval=%ds  cooldown=%ds  "
-        "scale_up=%.0f%%  scale_down=%.0f%%  min=%d  max=%d",
-        PROJECT_NAME, POLL_INTERVAL, COOLDOWN,
-        SCALE_UP_CPU, SCALE_DOWN_CPU, MIN_REPLICAS, MAX_REPLICAS,
+        "Autoscaler starting — project=%s  poll=%ds  poll_hot=%ds  hot_cpu=%.0f%%  "
+        "cooldown=%ds  scale_up=%.0f%%  scale_down=%.0f%%  min=%d  max=%d",
+        PROJECT_NAME, POLL_INTERVAL, POLL_INTERVAL_HOT, POLL_HOT_CPU,
+        COOLDOWN, SCALE_UP_CPU, SCALE_DOWN_CPU, MIN_REPLICAS, MAX_REPLICAS,
     )
 
     client = None
@@ -197,8 +199,9 @@ def main() -> None:
     last_scale_time: float = 0.0
 
     while True:
-        last_scale_time = poll(client, last_scale_time)
-        time.sleep(POLL_INTERVAL)
+        last_scale_time, avg_cpu = poll(client, last_scale_time)
+        interval = POLL_INTERVAL_HOT if avg_cpu >= POLL_HOT_CPU else POLL_INTERVAL
+        time.sleep(interval)
 
 
 if __name__ == "__main__":
