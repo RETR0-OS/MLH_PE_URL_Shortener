@@ -1,5 +1,6 @@
 """Integration tests for /urls endpoints."""
 import json
+import time
 
 
 def _seed_user(client, uid=1):
@@ -37,6 +38,7 @@ class TestCreateUrl:
     def test_event_created(self, client):
         uid = _seed_user(client)
         _create_url(client, uid)
+        time.sleep(0.5)
         events = client.get("/events").get_json()
         assert len(events) == 1
         assert events[0]["event_type"] == "created"

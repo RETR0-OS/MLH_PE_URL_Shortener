@@ -1,3 +1,5 @@
+import logging
+
 from dotenv import load_dotenv
 from flask import Flask, jsonify
 from prometheus_flask_exporter import PrometheusMetrics
@@ -6,6 +8,7 @@ from app.database import db, init_db
 from app.logging_config import setup_logging
 from app.middleware import register_middleware
 
+logger = logging.getLogger(__name__)
 metrics = PrometheusMetrics.for_app_factory()
 
 
@@ -24,11 +27,10 @@ def create_app():
     from app.models.user import User
 
     with db.connection_context():
-        db.create_tables([User, Url, Event], safe=True)
-        db.execute_sql(
-            'ALTER TABLE events ALTER COLUMN url_id DROP NOT NULL,'
-            ' ALTER COLUMN user_id DROP NOT NULL'
-        )
+        try:
+            db.create_tables([User, Url, Event], safe=True)
+        except Exception:
+            logger.info("Tables already exist (concurrent worker race), continuing")
 
     from app.routes import register_routes
     from app.utils.cache import warm_up

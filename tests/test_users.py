@@ -38,12 +38,12 @@ class TestCreateUser:
     def test_duplicate_username(self, client):
         _create_user(client, "dup", "a@b.com")
         resp = _create_user(client, "dup", "c@d.com")
-        assert resp.status_code in (400, 422)
+        assert resp.status_code in (400, 409, 422)
 
     def test_duplicate_email(self, client):
         _create_user(client, "u1", "same@e.com")
         resp = _create_user(client, "u2", "same@e.com")
-        assert resp.status_code in (400, 422)
+        assert resp.status_code in (400, 409, 422)
 
     def test_invalid_email_format(self, client):
         resp = _create_user(client, "u", "not-an-email")

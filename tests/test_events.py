@@ -1,5 +1,6 @@
 """Integration tests for /events endpoint."""
 import json
+import time
 
 
 class TestListEvents:
@@ -26,6 +27,7 @@ class TestListEvents:
             content_type="application/json",
         ).get_json()
 
+        time.sleep(0.5)
         events = client.get("/events").get_json()
         assert len(events) == 1
         evt = events[0]
@@ -93,6 +95,7 @@ class TestResponseFormat:
             ),
             content_type="application/json",
         )
+        time.sleep(0.5)
         evt = client.get("/events").get_json()[0]
         expected_keys = {"id", "url_id", "user_id", "event_type", "timestamp", "details"}
         assert set(evt.keys()) == expected_keys

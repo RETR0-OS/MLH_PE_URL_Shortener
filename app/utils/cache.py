@@ -46,7 +46,6 @@ def get_redis():
             decode_responses=True,
             socket_connect_timeout=0.5,
             socket_timeout=0.5,
-            retry_on_timeout=True,
             health_check_interval=30,
         )
         _redis_client.ping()
