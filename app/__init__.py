@@ -19,17 +19,6 @@ def create_app():
     init_db(app)
     metrics.init_app(app)
 
-    from app.models.event import Event
-    from app.models.url import Url
-    from app.models.user import User
-
-    with db.connection_context():
-        db.create_tables([User, Url, Event], safe=True)
-        db.execute_sql(
-            'ALTER TABLE events ALTER COLUMN url_id DROP NOT NULL,'
-            ' ALTER COLUMN user_id DROP NOT NULL'
-        )
-
     from app.routes import register_routes
     from app.utils.cache import warm_up
 

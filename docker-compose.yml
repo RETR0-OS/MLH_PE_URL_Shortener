@@ -16,6 +16,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      init-db:
+        condition: service_completed_successfully
     restart: unless-stopped
     stop_grace_period: 30s
     logging:
@@ -37,6 +39,21 @@ services:
         limits:
           cpus: "0.75"
           memory: 384M
+
+  init-db:
+    build: .
+    command: python scripts/init_db.py
+    environment:
+      PYTHONPATH: /app
+      DATABASE_NAME: hackathon_db
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   postgres:
     image: postgres:16-alpine
