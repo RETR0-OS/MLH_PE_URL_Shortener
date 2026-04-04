@@ -8,6 +8,9 @@ const BASE_URL = __ENV.BASE_URL || "http://localhost:80";
 //
 // ---------- Tier 2: 200 concurrent users ----------
 // Run: k6 run --env SCENARIO=tier2 loadtests/k6_test.js
+//
+// ---------- Tier 3: 500 concurrent users ----------
+// Run: k6 run --env SCENARIO=tier3 loadtests/k6_test.js
 
 const scenarios = {
   tier1: {
@@ -22,6 +25,15 @@ const scenarios = {
       { duration: "30s", target: 200 },
       { duration: "1m", target: 200 },
       { duration: "15s", target: 0 },
+    ],
+  },
+  tier3: {
+    executor: "ramping-vus",
+    startVUs: 0,
+    stages: [
+      { duration: "30s", target: 500 },
+      { duration: "1m30s", target: 500 },
+      { duration: "20s", target: 0 },
     ],
   },
 };

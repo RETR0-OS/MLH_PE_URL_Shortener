@@ -1,0 +1,51 @@
+name: Load Tests
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start services
+        run: docker compose up -d --build --wait
+
+      - name: Wait for healthy stack
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:80/health > /dev/null 2>&1; then
+              echo "Stack is healthy"
+              exit 0
+            fi
+            echo "Waiting for stack... ($i/30)"
+            sleep 2
+          done
+          echo "Stack failed to become healthy"
+          docker compose logs
+          exit 1
+
+      - name: Install k6
+        run: |
+          curl -fsSL https://dl.k6.io/key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/k6-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+      - name: Load test - Tier 1 (50 VUs)
+        run: k6 run --env SCENARIO=tier1 --env BASE_URL=http://localhost:80 loadtests/k6_test.js
+
+      - name: Load test - Tier 2 (200 VUs)
+        run: k6 run --env SCENARIO=tier2 --env BASE_URL=http://localhost:80 loadtests/k6_test.js
+
+      - name: Load test - Tier 3 (500 VUs)
+        run: k6 run --env SCENARIO=tier3 --env BASE_URL=http://localhost:80 loadtests/k6_test.js
+
+      - name: Collect logs on failure
+        if: failure()
+        run: docker compose logs --tail=100
