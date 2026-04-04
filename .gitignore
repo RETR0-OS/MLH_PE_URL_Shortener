@@ -33,6 +33,7 @@ Thumbs.db
 # Judging (not visible to participants)
 judging/
 
+.claude
 # Backups
 backups/
 
