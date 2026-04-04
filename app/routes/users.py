@@ -45,7 +45,7 @@ def create_user():
         with db.atomic():
             user = User.create(username=data["username"], email=data["email"])
     except IntegrityError as exc:
-        return jsonify({"error": str(exc)}), 422
+        return jsonify({"error": str(exc)}), 409
     checkpoint("db_write")
 
     return jsonify(user.to_dict()), 201
