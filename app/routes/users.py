@@ -110,23 +110,35 @@ def bulk_load_users():
     stream = io.StringIO(file.stream.read().decode("utf-8"))
     reader = csv.DictReader(stream)
 
-    count = 0
+    rows = []
     for row in reader:
         username = row.get("username", "").strip()
         email = row.get("email", "").strip()
         created_at = row.get("created_at", "").strip()
-
         if not username or not email:
             continue
+        rows.append({
+            "username": username,
+            "email": email,
+            "created_at": created_at or datetime.datetime.now(),
+        })
 
+    from app.database import db
+
+    count = 0
+    batch_size = 100
+    for i in range(0, len(rows), batch_size):
+        batch = rows[i:i + batch_size]
         try:
-            User.create(
-                username=username,
-                email=email,
-                created_at=created_at or datetime.datetime.now(),
-            )
-            count += 1
+            with db.atomic():
+                User.insert_many(batch).execute()
+            count += len(batch)
         except IntegrityError:
-            continue
+            for row in batch:
+                try:
+                    User.create(**row)
+                    count += 1
+                except IntegrityError:
+                    continue
 
     return jsonify(count=count), 201

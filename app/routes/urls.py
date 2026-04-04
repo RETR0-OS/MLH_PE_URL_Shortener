@@ -1,31 +1,14 @@
 import datetime
-import json
 
 from flask import Blueprint, jsonify, redirect, request
 from peewee import IntegrityError
 
+from app.event_writer import log_event
 from app.models.url import Url
 from app.models.user import User
-from app.models.event import Event
 from app.utils import encode_base62
 
 urls_bp = Blueprint("urls", __name__)
-
-
-def _log_event(url, user_id, event_type, extra=None):
-    details = {
-        "short_code": url.short_code,
-        "original_url": url.original_url,
-    }
-    if extra:
-        details.update(extra)
-    Event.create(
-        url_id=url.id,
-        user_id=user_id,
-        event_type=event_type,
-        timestamp=datetime.datetime.now(),
-        details=json.dumps(details),
-    )
 
 
 @urls_bp.route("/urls", methods=["GET"])
@@ -62,7 +45,8 @@ def redirect_short_code(short_code):
     if not url.is_active:
         return jsonify(error="URL is inactive"), 410
 
-    _log_event(url, url.user_id_id, "redirect")
+    log_event(url.id, url.user_id_id, "redirect",
+              short_code=url.short_code, original_url=url.original_url)
 
     return redirect(url.original_url, code=302)
 
@@ -100,7 +84,8 @@ def create_url():
     url.short_code = encode_base62(url.id)
     url.save()
 
-    _log_event(url, user_id, "created")
+    log_event(url.id, user_id, "created",
+              short_code=url.short_code, original_url=url.original_url)
 
     return jsonify(url.to_dict()), 201
 
@@ -130,7 +115,8 @@ def update_url(url_id):
     url.updated_at = datetime.datetime.now()
     url.save()
 
-    _log_event(url, url.user_id_id, "updated")
+    log_event(url.id, url.user_id_id, "updated",
+              short_code=url.short_code, original_url=url.original_url)
 
     return jsonify(url.to_dict())
 

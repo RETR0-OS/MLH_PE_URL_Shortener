@@ -1,25 +1,31 @@
-import app.database as _db_module
 import pytest
 from peewee import SqliteDatabase
 
+import app.database as _db_module
 from app.database import db
 from app.models import User, Url, Event
 
-TEST_DB = SqliteDatabase(":memory:")
 MODELS = [User, Url, Event]
 
 
 @pytest.fixture(autouse=True)
-def setup_db():
-    _db_module._testing = True
-    db.initialize(TEST_DB)
-    TEST_DB.bind(MODELS)
-    TEST_DB.connect()
-    TEST_DB.create_tables(MODELS)
-    yield
-    TEST_DB.drop_tables(MODELS)
-    TEST_DB.close()
+def setup_db(tmp_path):
+    db_path = str(tmp_path / "test.db")
+    test_db = SqliteDatabase(db_path, pragmas={
+        "journal_mode": "wal",
+        "foreign_keys": 1,
+    })
+
     _db_module._testing = False
+    db.initialize(test_db)
+    test_db.bind(MODELS)
+    test_db.connect()
+    test_db.create_tables(MODELS)
+    yield
+    from app.event_writer import flush_pending
+    flush_pending()
+    test_db.drop_tables(MODELS)
+    test_db.close()
 
 
 @pytest.fixture()
