@@ -1,23 +1,59 @@
 from dotenv import load_dotenv
 from flask import Flask, jsonify
+from prometheus_flask_exporter import PrometheusMetrics
 
-from app.database import init_db
-from app.routes import register_routes
+from app.database import db, init_db
+from app.logging_config import setup_logging
+from app.middleware import register_middleware
+
+metrics = PrometheusMetrics.for_app_factory()
 
 
 def create_app():
     load_dotenv()
+    setup_logging()
 
     app = Flask(__name__)
 
     init_db(app)
+    metrics.init_app(app)
+    register_middleware(app)
 
-    from app import models  # noqa: F401 - registers models with Peewee
+    from app.models.event import Event
+    from app.models.url import Url
+    from app.models.user import User
+
+    with db.connection_context():
+        db.create_tables([User, Url, Event], safe=True)
+
+    from app.routes import register_routes
 
     register_routes(app)
 
     @app.route("/health")
+    @metrics.do_not_track()
     def health():
         return jsonify(status="ok")
+
+    @app.route("/health/ready")
+    @metrics.do_not_track()
+    def health_ready():
+        try:
+            db.execute_sql("SELECT 1")
+            return jsonify(status="ok")
+        except Exception:
+            return jsonify(status="unavailable"), 503
+
+    @app.errorhandler(404)
+    def not_found(e):
+        return jsonify(error="Not found"), 404
+
+    @app.errorhandler(405)
+    def method_not_allowed(e):
+        return jsonify(error="Method not allowed"), 405
+
+    @app.errorhandler(500)
+    def internal_error(e):
+        return jsonify(error="Internal server error"), 500
 
     return app

@@ -1,192 +1,130 @@
-# MLH PE Hackathon — Flask + Peewee + PostgreSQL Template
+# MLH PE URL Shortener
 
-A minimal hackathon starter template. You get the scaffolding and database wiring — you build the models, routes, and CSV loading logic.
+A production-grade URL shortener API built for the MLH Production Engineering hackathon. Covers all 4 tracks: Reliability, Scalability, Incident Response, and Documentation.
 
-**Stack:** Flask · Peewee ORM · PostgreSQL · uv
+## Architecture
 
-## **Important**
+```mermaid
+graph TD
+  Client --> Nginx["Nginx (rate limit + gzip)"]
+  Nginx -->|"proxy_pass + retry"| AppR1["App Replica 1 (Gunicorn gthread)"]
+  Nginx -->|"proxy_pass + retry"| AppR2["App Replica 2"]
+  AppR1 -->|"circuit breaker"| Redis["Redis (LRU, 128MB)"]
+  AppR2 -->|"circuit breaker"| Redis
+  AppR1 -->|"pooled conn"| PostgreSQL["PostgreSQL (tuned)"]
+  AppR2 -->|"pooled conn"| PostgreSQL
+  Prometheus -->|"scrape /metrics"| AppR1
+  Prometheus -->|"scrape /metrics"| AppR2
+  Prometheus --> Alertmanager --> Discord
+  Grafana --> Prometheus
+  Grafana --> Loki
+```
 
-You need to work with around the seed files that you can find in [MLH PE Hackathon](https://mlh-pe-hackathon.com) platform. This will help you build the schema for the database and have some data to do some testing and submit your project for judging. If you need help with this, reach out on Discord or on the Q&A tab on the platform.
-
-## Prerequisites
-
-- **uv** — a fast Python package manager that handles Python versions, virtual environments, and dependencies automatically.
-  Install it with:
-  ```bash
-  # macOS / Linux
-  curl -LsSf https://astral.sh/uv/install.sh | sh
-
-  # Windows (PowerShell)
-  powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-  ```
-  For other methods see the [uv installation docs](https://docs.astral.sh/uv/getting-started/installation/).
-- PostgreSQL running locally (you can use Docker or a local instance)
-
-## uv Basics
-
-`uv` manages your Python version, virtual environment, and dependencies automatically — no manual `python -m venv` needed.
-
-| Command | What it does |
-|---------|--------------|
-| `uv sync` | Install all dependencies (creates `.venv` automatically) |
-| `uv run <script>` | Run a script using the project's virtual environment |
-| `uv add <package>` | Add a new dependency |
-| `uv remove <package>` | Remove a dependency |
-
-## Quick Start
+## Quick Start (Local Development)
 
 ```bash
-# 1. Clone the repo
-git clone <repo-url> && cd mlh-pe-hackathon
-
-# 2. Install dependencies
+# Install dependencies
 uv sync
 
-# 3. Create the database
+# Set up Postgres (create database)
 createdb hackathon_db
 
-# 4. Configure environment
-cp .env.example .env   # edit if your DB credentials differ
+# Run the dev server
+uv run flask --app run:app run --port 5000
 
-# 5. Run the server
-uv run run.py
+# Seed data (optional)
+uv run python scripts/seed.py
 
-# 6. Verify
-curl http://localhost:5000/health
-# → {"status":"ok"}
+# Run tests
+uv run pytest --cov=app
 ```
 
-## Project Structure
+## Docker Compose (Production)
 
-```
-mlh-pe-hackathon/
-├── app/
-│   ├── __init__.py          # App factory (create_app)
-│   ├── database.py          # DatabaseProxy, BaseModel, connection hooks
-│   ├── models/
-│   │   └── __init__.py      # Import your models here
-│   └── routes/
-│       └── __init__.py      # register_routes() — add blueprints here
-├── .env.example             # DB connection template
-├── .gitignore               # Python + uv gitignore
-├── .python-version          # Pin Python version for uv
-├── pyproject.toml           # Project metadata + dependencies
-├── run.py                   # Entry point: uv run run.py
-└── README.md
+```bash
+# Start the full stack
+docker compose up -d --build
+
+# Seed the database
+docker compose exec app python scripts/seed.py
+
+# Scale app replicas
+docker compose up -d --scale app=3
+
+# View logs
+docker compose logs -f app
 ```
 
-## How to Add a Model
+## Docker Swarm Deployment
 
-1. Create a file in `app/models/`, e.g. `app/models/product.py`:
+```bash
+docker swarm init
+docker stack deploy -c docker-compose.yml urlshort
 
-```python
-from peewee import CharField, DecimalField, IntegerField
+# Scale
+docker service scale urlshort_app=3
 
-from app.database import BaseModel
+# Rolling update
+docker service update --image app:v2 urlshort_app
 
-
-class Product(BaseModel):
-    name = CharField()
-    category = CharField()
-    price = DecimalField(decimal_places=2)
-    stock = IntegerField()
+# Rollback
+docker service update --rollback urlshort_app
 ```
 
-2. Import it in `app/models/__init__.py`:
+## API Endpoints
 
-```python
-from app.models.product import Product
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Liveness probe |
+| GET | `/health/ready` | Readiness probe (DB check) |
+| GET | `/users` | List users (paginated) |
+| POST | `/users` | Create user |
+| POST | `/users/bulk` | Bulk import users (CSV) |
+| GET | `/users/{id}` | Get user by ID |
+| PUT | `/users/{id}` | Update user |
+| GET | `/urls` | List URLs (filter by `?user_id=`) |
+| POST | `/urls` | Create shortened URL |
+| GET | `/urls/{id}` | Get URL by ID |
+| PUT | `/urls/{id}` | Update URL |
+| GET | `/events` | List events |
+| GET | `/metrics` | Prometheus metrics |
 
-3. Create the table (run once in a Python shell or a setup script):
+Full API specification: [docs/openapi.yaml](docs/openapi.yaml)
 
-```python
-from app.database import db
-from app.models.product import Product
+## Service Ports
 
-db.create_tables([Product])
-```
+| Service | Port |
+|---------|------|
+| App (Gunicorn) | 5000 |
+| Nginx | 80 |
+| PostgreSQL | 5432 |
+| Redis | 6379 |
+| Prometheus | 9090 |
+| Alertmanager | 9093 |
+| Grafana | 3000 |
+| Loki | 3100 |
 
-## How to Add Routes
+## Documentation
 
-1. Create a blueprint in `app/routes/`, e.g. `app/routes/products.py`:
+- [API Specification](docs/openapi.yaml)
+- [Deploy Guide](docs/DEPLOY_GUIDE.md)
+- [Environment Variables](docs/ENV_VARS.md)
+- [Error Handling](docs/ERROR_HANDLING.md)
+- [Failure Modes](docs/FAILURE_MODES.md)
+- [Bottleneck Report](docs/BOTTLENECK_REPORT.md)
+- [Runbook](docs/RUNBOOK.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Decision Log (ADRs)](docs/DECISION_LOG.md)
+- [Capacity Plan](docs/CAPACITY_PLAN.md)
+- [SLOs](docs/SLO.md)
+- [Tracks Master Plan](docs/TRACKS_MASTER_PLAN.md)
 
-```python
-from flask import Blueprint, jsonify
-from playhouse.shortcuts import model_to_dict
+## Tech Stack
 
-from app.models.product import Product
-
-products_bp = Blueprint("products", __name__)
-
-
-@products_bp.route("/products")
-def list_products():
-    products = Product.select()
-    return jsonify([model_to_dict(p) for p in products])
-```
-
-2. Register it in `app/routes/__init__.py`:
-
-```python
-def register_routes(app):
-    from app.routes.products import products_bp
-    app.register_blueprint(products_bp)
-```
-
-## How to Load CSV Data
-
-```python
-import csv
-from peewee import chunked
-from app.database import db
-from app.models.product import Product
-
-def load_csv(filepath):
-    with open(filepath, newline="") as f:
-        reader = csv.DictReader(f)
-        rows = list(reader)
-
-    with db.atomic():
-        for batch in chunked(rows, 100):
-            Product.insert_many(batch).execute()
-```
-
-## Useful Peewee Patterns
-
-```python
-from peewee import fn
-from playhouse.shortcuts import model_to_dict
-
-# Select all
-products = Product.select()
-
-# Filter
-cheap = Product.select().where(Product.price < 10)
-
-# Get by ID
-p = Product.get_by_id(1)
-
-# Create
-Product.create(name="Widget", category="Tools", price=9.99, stock=50)
-
-# Convert to dict (great for JSON responses)
-model_to_dict(p)
-
-# Aggregations
-avg_price = Product.select(fn.AVG(Product.price)).scalar()
-total = Product.select(fn.SUM(Product.stock)).scalar()
-
-# Group by
-from peewee import fn
-query = (Product
-         .select(Product.category, fn.COUNT(Product.id).alias("count"))
-         .group_by(Product.category))
-```
-
-## Tips
-
-- Use `model_to_dict` from `playhouse.shortcuts` to convert model instances to dictionaries for JSON responses.
-- Wrap bulk inserts in `db.atomic()` for transactional safety and performance.
-- The template uses `teardown_appcontext` for connection cleanup, so connections are closed even when requests fail.
-- Check `.env.example` for all available configuration options.
+- **Runtime**: Python 3.13, Flask, Gunicorn (gthread)
+- **Database**: PostgreSQL 16 (tuned), Peewee ORM (pooled connections)
+- **Cache**: Redis 7 (LRU, circuit-breaker fallback)
+- **Proxy**: Nginx (rate limiting, gzip, keepalive, proxy retries)
+- **Observability**: Prometheus, Alertmanager, Grafana, Loki
+- **CI/CD**: GitHub Actions (pytest + coverage gate)
+- **Orchestration**: Docker Swarm (rolling updates, self-healing, secrets)

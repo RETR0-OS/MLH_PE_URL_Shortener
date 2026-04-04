@@ -7,7 +7,21 @@ dependencies = [
     "email-validator>=2.3.0",
     "faker>=33.0",
     "flask>=3.1",
+    "gunicorn>=23.0",
     "peewee>=3.17",
     "psycopg2-binary>=2.9",
     "python-dotenv>=1.0",
+    "redis>=5.0",
+    "python-json-logger>=3.0",
+    "prometheus-flask-exporter>=0.23",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=6.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
