@@ -24,3 +24,15 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["app*"]
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+
+[tool.coverage.run]
+source = ["app"]
+
+[tool.coverage.paths]
+source = [
+    "app/",
+    "**/site-packages/app/",
+]

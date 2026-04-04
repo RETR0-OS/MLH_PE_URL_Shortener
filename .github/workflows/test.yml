@@ -24,7 +24,4 @@ jobs:
           pip install .[test]
 
       - name: Run tests with coverage
-        run: pytest --cov=app --cov-report=term-missing -v
-
-      - name: Fail if coverage below 50%
-        run: pytest --cov=app --cov-fail-under=50 -q
+        run: pytest --cov=app --cov-report=term-missing --cov-fail-under=50 -v
