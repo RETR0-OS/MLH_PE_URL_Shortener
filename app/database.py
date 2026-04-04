@@ -39,7 +39,10 @@ def init_db(app):
 
     @app.before_request
     def _db_connect():
+        from app.middleware import checkpoint
+
         db.connect(reuse_if_open=True)
+        checkpoint("db_connect")
 
     @app.teardown_appcontext
     def _db_close(exc):

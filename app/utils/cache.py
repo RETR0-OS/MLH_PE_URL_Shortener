@@ -101,14 +101,18 @@ def cache_delete(key):
 
 
 def cache_delete_pattern(pattern):
-    """Delete all keys matching a pattern. Fails silently."""
+    """Delete keys matching a pattern using SCAN (non-blocking). Fails silently."""
     r = get_redis()
     if r is None:
         return
     try:
-        keys = r.keys(pattern)
-        if keys:
-            r.delete(*keys)
+        cursor = 0
+        while True:
+            cursor, keys = r.scan(cursor, match=pattern, count=100)
+            if keys:
+                r.delete(*keys)
+            if cursor == 0:
+                break
     except Exception:
         logger.warning("Redis DELETE pattern failed for %s", pattern)
         _open_circuit()

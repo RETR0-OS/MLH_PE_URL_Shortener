@@ -4,10 +4,11 @@ from flask import Blueprint, jsonify, request
 from peewee import IntegrityError
 
 from app.database import db
-from app.models.event import Event
+from app.event_writer import log_event
+from app.middleware import checkpoint
 from app.models.url import Url
 from app.models.user import User
-from app.utils.cache import cache_delete, cache_delete_pattern, cache_get, cache_set
+from app.utils.cache import cache_delete, cache_get, cache_set
 from app.utils.shortcode import generate_short_code
 from app.utils.validation import validate_url_create, validate_url_update
 
@@ -26,7 +27,10 @@ def list_urls():
     if user_id is not None:
         query = query.where(Url.user == user_id)
 
-    return jsonify([u.to_dict() for u in query])
+    checkpoint("query_build")
+    result = [u.to_dict() for u in query]
+    checkpoint("db_query_and_serialize")
+    return jsonify(result)
 
 
 @urls_bp.route("/urls", methods=["POST"])
@@ -37,53 +41,49 @@ def create_url():
         return jsonify(errors), 400
     if errors:
         return jsonify({"error": "Validation failed", "details": errors}), 422
+    checkpoint("validation")
 
     try:
         User.get_by_id(data["user_id"])
     except User.DoesNotExist:
         return jsonify(error=f"User {data['user_id']} not found"), 400
-
-    short_code = None
-    for _ in range(10):
-        candidate = generate_short_code()
-        if not Url.select().where(Url.short_code == candidate).exists():
-            short_code = candidate
-            break
-    if short_code is None:
-        return jsonify(error="Failed to generate unique short code"), 500
+    checkpoint("user_lookup")
 
     now = _utcnow()
-    try:
-        with db.atomic():
-            url = Url.create(
-                user=data["user_id"],
-                short_code=short_code,
-                original_url=data["original_url"],
-                title=data["title"],
-                is_active=True,
-                created_at=now,
-                updated_at=now,
-            )
-            Event.create(
-                url=url.id,
-                user=data["user_id"],
-                event_type="created",
-                timestamp=now,
-                details={
-                    "short_code": short_code,
-                    "original_url": data["original_url"],
-                },
-            )
-    except IntegrityError as exc:
-        return jsonify({"error": str(exc)}), 422
+    for attempt in range(3):
+        short_code = generate_short_code()
+        try:
+            with db.atomic():
+                url = Url.create(
+                    user=data["user_id"],
+                    short_code=short_code,
+                    original_url=data["original_url"],
+                    title=data["title"],
+                    is_active=True,
+                    created_at=now,
+                    updated_at=now,
+                )
+            checkpoint("url_insert")
+            break
+        except IntegrityError:
+            if attempt == 2:
+                return jsonify(error="Failed to generate unique short code"), 500
 
-    cache_delete_pattern("urls:user:*")
-    return jsonify(url.to_dict()), 201
+    log_event(url.id, data["user_id"], "created", {
+        "short_code": short_code,
+        "original_url": data["original_url"],
+    })
+    checkpoint("event_queued")
+
+    resp = jsonify(url.to_dict())
+    checkpoint("serialize")
+    return resp, 201
 
 
 @urls_bp.route("/urls/<int:url_id>", methods=["GET"])
 def get_url(url_id):
     cached = cache_get(f"url:{url_id}")
+    checkpoint("cache_get")
     if cached is not None:
         return jsonify(cached)
 
@@ -91,9 +91,11 @@ def get_url(url_id):
         url = Url.get_by_id(url_id)
     except Url.DoesNotExist:
         return jsonify(error="URL not found"), 404
+    checkpoint("db_read")
 
     data = url.to_dict()
     cache_set(f"url:{url_id}", data, ttl=300)
+    checkpoint("cache_set")
     return jsonify(data)
 
 
@@ -123,5 +125,4 @@ def update_url(url_id):
         return jsonify({"error": str(exc)}), 422
 
     cache_delete(f"url:{url_id}")
-    cache_delete_pattern("urls:user:*")
     return jsonify(url.to_dict())

@@ -6,6 +6,7 @@ from flask import Blueprint, jsonify, request
 from peewee import IntegrityError
 
 from app.database import db
+from app.middleware import checkpoint
 from app.models.user import User
 from app.utils.validation import validate_user_create, validate_user_update
 
@@ -25,7 +26,9 @@ def list_users():
     per_page = request.args.get("per_page", 20, type=int)
 
     query = User.select().order_by(User.id).paginate(page, per_page)
-    return jsonify([u.to_dict() for u in query])
+    result = [u.to_dict() for u in query]
+    checkpoint("db_query_and_serialize")
+    return jsonify(result)
 
 
 @users_bp.route("/users", methods=["POST"])
@@ -36,12 +39,14 @@ def create_user():
         return jsonify(errors), 400
     if errors:
         return jsonify({"error": "Validation failed", "details": errors}), 422
+    checkpoint("validation")
 
     try:
         with db.atomic():
             user = User.create(username=data["username"], email=data["email"])
     except IntegrityError as exc:
         return jsonify({"error": str(exc)}), 422
+    checkpoint("db_write")
 
     return jsonify(user.to_dict()), 201
 

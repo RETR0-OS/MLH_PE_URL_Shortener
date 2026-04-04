@@ -15,9 +15,9 @@ def create_app():
 
     app = Flask(__name__)
 
+    register_middleware(app)
     init_db(app)
     metrics.init_app(app)
-    register_middleware(app)
 
     from app.models.event import Event
     from app.models.url import Url
