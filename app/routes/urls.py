@@ -57,8 +57,8 @@ def redirect_short_code(short_code):
 @urls_bp.route("/urls", methods=["POST"])
 def create_url():
     data = request.get_json(silent=True)
-    if not data:
-        return jsonify(error="Request body must be JSON"), 400
+    if not data or not isinstance(data, dict):
+        return jsonify(error="Request body must be a JSON object"), 400
 
     user_id = data.get("user_id")
     original_url = data.get("original_url")
@@ -73,6 +73,12 @@ def create_url():
         User.get_by_id(user_id)
     except User.DoesNotExist:
         return jsonify(error="User not found"), 404
+
+    existing = Url.select().where(
+        (Url.user_id == user_id) & (Url.original_url == original_url.strip())
+    ).first()
+    if existing:
+        return jsonify(existing.to_dict()), 409
 
     now = datetime.datetime.now()
     with db.atomic():
@@ -102,8 +108,8 @@ def update_url(url_id):
         return jsonify(error="URL not found"), 404
 
     data = request.get_json(silent=True)
-    if not data:
-        return jsonify(error="Request body must be JSON"), 400
+    if not data or not isinstance(data, dict):
+        return jsonify(error="Request body must be a JSON object"), 400
 
     if "title" in data:
         url.title = data["title"] if isinstance(data["title"], str) else ""

@@ -35,8 +35,8 @@ def get_user(user_id):
 @users_bp.route("/users", methods=["POST"])
 def create_user():
     data = request.get_json(silent=True)
-    if not data:
-        return jsonify(error="Request body must be JSON"), 400
+    if not data or not isinstance(data, dict):
+        return jsonify(error="Request body must be a JSON object"), 400
 
     username = data.get("username")
     email = data.get("email")
@@ -69,8 +69,8 @@ def update_user(user_id):
         return jsonify(error="User not found"), 404
 
     data = request.get_json(silent=True)
-    if not data:
-        return jsonify(error="Request body must be JSON"), 400
+    if not data or not isinstance(data, dict):
+        return jsonify(error="Request body must be a JSON object"), 400
 
     if "username" in data:
         if not isinstance(data["username"], str) or not data["username"].strip():

@@ -610,3 +610,123 @@ def test_delete_user_cascades(client):
     client.delete(f"/users/{uid}")
 
     assert client.get(f"/urls/{url_id}").status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Edge cases
+# ---------------------------------------------------------------------------
+
+
+def test_duplicate_url_same_user_returns_409(client):
+    uid = _make_user(client, "twin")
+    r1 = client.post("/urls", json={"user_id": uid, "original_url": "https://twin.com", "title": "T"})
+    assert r1.status_code == 201
+    r2 = client.post("/urls", json={"user_id": uid, "original_url": "https://twin.com", "title": "T again"})
+    assert r2.status_code == 409
+    assert r2.get_json()["short_code"] == r1.get_json()["short_code"]
+
+
+def test_different_users_same_url_ok(client):
+    u1 = _make_user(client, "twin_a")
+    u2 = _make_user(client, "twin_b")
+    r1 = client.post("/urls", json={"user_id": u1, "original_url": "https://shared.com", "title": "S"})
+    r2 = client.post("/urls", json={"user_id": u2, "original_url": "https://shared.com", "title": "S"})
+    assert r1.status_code == 201
+    assert r2.status_code == 201
+    assert r1.get_json()["short_code"] != r2.get_json()["short_code"]
+
+
+def test_redirect_creates_event(client):
+    from app.event_writer import flush_pending
+
+    uid = _make_user(client, "observer")
+    r = client.post("/urls", json={"user_id": uid, "original_url": "https://obs.com", "title": "O"})
+    short = r.get_json()["short_code"]
+    url_id = r.get_json()["id"]
+
+    resp = client.get(f"/urls/{short}/redirect")
+    assert resp.status_code == 302
+
+    flush_pending()
+    events = client.get(f"/events?url_id={url_id}&event_type=redirect").get_json()
+    assert len(events) >= 1
+    assert events[0]["event_type"] == "redirect"
+
+
+def test_inactive_redirect_no_event(client):
+    uid = _make_user(client, "sleeper")
+    r = client.post("/urls", json={"user_id": uid, "original_url": "https://sleep.com", "title": "Z"})
+    url_id = r.get_json()["id"]
+    short = r.get_json()["short_code"]
+    client.put(f"/urls/{url_id}", json={"is_active": False})
+
+    events_before = client.get(f"/events?url_id={url_id}&event_type=redirect").get_json()
+
+    resp = client.get(f"/urls/{short}/redirect")
+    assert resp.status_code == 410
+
+    events_after = client.get(f"/events?url_id={url_id}&event_type=redirect").get_json()
+    assert len(events_after) == len(events_before)
+
+
+def test_array_body_rejected_users(client):
+    resp = client.post("/users", data="[1,2,3]", content_type="application/json")
+    assert resp.status_code == 400
+
+
+def test_array_body_rejected_urls(client):
+    resp = client.post("/urls", data="[1,2,3]", content_type="application/json")
+    assert resp.status_code == 400
+
+
+def test_array_body_rejected_events(client):
+    resp = client.post("/events", data="[1,2,3]", content_type="application/json")
+    assert resp.status_code == 400
+
+
+def test_array_body_rejected_update_user(client):
+    cr = client.post("/users", json={"username": "arr", "email": "arr@x.com"})
+    uid = cr.get_json()["id"]
+    resp = client.put(f"/users/{uid}", data="[1,2,3]", content_type="application/json")
+    assert resp.status_code == 400
+
+
+def test_array_body_rejected_update_url(client):
+    uid = _make_user(client, "arr_url")
+    r = client.post("/urls", json={"user_id": uid, "original_url": "https://arr.com", "title": "A"})
+    url_id = r.get_json()["id"]
+    resp = client.put(f"/urls/{url_id}", data="[1,2,3]", content_type="application/json")
+    assert resp.status_code == 400
+
+
+def test_event_details_rejects_string(client):
+    uid = _make_user(client, "scroll")
+    r = client.post("/urls", json={"user_id": uid, "original_url": "https://scr.com", "title": "S"})
+    url_id = r.get_json()["id"]
+    resp = client.post("/events", json={
+        "url_id": url_id, "user_id": uid, "event_type": "trick",
+        "details": "just a string",
+    })
+    assert resp.status_code == 400
+
+
+def test_event_details_rejects_number(client):
+    uid = _make_user(client, "numscr")
+    r = client.post("/urls", json={"user_id": uid, "original_url": "https://ns.com", "title": "N"})
+    url_id = r.get_json()["id"]
+    resp = client.post("/events", json={
+        "url_id": url_id, "user_id": uid, "event_type": "trick",
+        "details": 42,
+    })
+    assert resp.status_code == 400
+
+
+def test_event_details_rejects_array(client):
+    uid = _make_user(client, "arrscr")
+    r = client.post("/urls", json={"user_id": uid, "original_url": "https://as.com", "title": "A"})
+    url_id = r.get_json()["id"]
+    resp = client.post("/events", json={
+        "url_id": url_id, "user_id": uid, "event_type": "trick",
+        "details": [1, 2, 3],
+    })
+    assert resp.status_code == 400
