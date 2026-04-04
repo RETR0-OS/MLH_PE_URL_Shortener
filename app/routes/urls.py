@@ -1,6 +1,6 @@
 import datetime
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, redirect, request
 from peewee import IntegrityError
 
 from app.database import db
@@ -26,6 +26,10 @@ def list_urls():
     user_id = request.args.get("user_id", type=int)
     if user_id is not None:
         query = query.where(Url.user == user_id)
+
+    is_active = request.args.get("is_active")
+    if is_active is not None:
+        query = query.where(Url.is_active == (is_active.lower() == "true"))
 
     checkpoint("query_build")
     result = [u.to_dict() for u in query]
@@ -126,3 +130,29 @@ def update_url(url_id):
 
     cache_delete(f"url:{url_id}")
     return jsonify(url.to_dict())
+
+
+@urls_bp.route("/urls/<short_code>/redirect", methods=["GET"])
+def redirect_short_code(short_code):
+    try:
+        url = Url.get(Url.short_code == short_code)
+    except Url.DoesNotExist:
+        return jsonify(error="Not found"), 404
+
+    if not url.is_active:
+        return jsonify(error="URL is deactivated"), 410
+
+    log_event(url.id, url.user_id, "redirect", {"short_code": short_code})
+    return redirect(url.original_url, code=302)
+
+
+@urls_bp.route("/urls/<int:url_id>", methods=["DELETE"])
+def delete_url(url_id):
+    try:
+        url = Url.get_by_id(url_id)
+    except Url.DoesNotExist:
+        return jsonify(error="URL not found"), 404
+
+    url.delete_instance(recursive=True)
+    cache_delete(f"url:{url_id}")
+    return "", 204
