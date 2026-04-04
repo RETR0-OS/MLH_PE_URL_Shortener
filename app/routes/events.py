@@ -102,6 +102,8 @@ def create_event():
         return jsonify(error="user_id must be an integer"), 400
     if not isinstance(event_type, str) or not event_type.strip():
         return jsonify(error="event_type must be a non-empty string"), 400
+    if not isinstance(details, dict):
+        return jsonify(error="details must be a JSON object"), 400
 
     try:
         Url.get_by_id(url_id)

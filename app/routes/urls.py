@@ -137,6 +137,11 @@ def update_url(url_id):
         return jsonify({"error": str(exc)}), 422
 
     cache_delete(f"url:{url_id}")
+
+    log_event(url.id, url.user_id, "updated", {
+        k: data[k] for k in ("title", "is_active") if k in data
+    })
+
     return jsonify(url.to_dict())
 
 
