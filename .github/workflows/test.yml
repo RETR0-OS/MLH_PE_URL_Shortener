@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install .[test]
+          pip install flask peewee psycopg2-binary python-dotenv email-validator "faker>=33.0" argon2-cffi gunicorn pytest pytest-cov
 
       - name: Run tests with coverage
         run: pytest --cov=app --cov-report=term-missing --cov-fail-under=50 -v
