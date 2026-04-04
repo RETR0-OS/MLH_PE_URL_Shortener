@@ -13,6 +13,10 @@ events_bp = Blueprint("events", __name__)
 def list_events():
     query = Event.select().order_by(Event.id)
 
+    cursor = request.args.get("cursor", type=int)
+    if cursor is not None:
+        query = query.where(Event.id > cursor)
+
     url_id = request.args.get("url_id", type=int)
     if url_id is not None:
         query = query.where(Event.url == url_id)
@@ -24,6 +28,10 @@ def list_events():
     event_type = request.args.get("event_type")
     if event_type is not None:
         query = query.where(Event.event_type == event_type)
+
+    per_page = request.args.get("per_page", 100, type=int)
+    if cursor is not None:
+        query = query.limit(per_page)
 
     return jsonify([e.to_dict() for e in query])
 

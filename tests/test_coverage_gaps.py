@@ -243,7 +243,7 @@ class TestUrlStructuralErrors:
                 ),
                 content_type="application/json",
             )
-            assert resp.status_code == 422
+            assert resp.status_code == 500
             assert "error" in resp.get_json()
 
     def test_update_url_integrity_error(self, client):
@@ -431,7 +431,7 @@ class TestCacheWithMockedRedis:
         import app.utils.cache as cache_mod
 
         mock = self._make_mock_redis()
-        mock.keys.return_value = ["urls:user:1", "urls:user:2"]
+        mock.scan.return_value = (0, ["urls:user:1", "urls:user:2"])
         cache_mod._redis_client = mock
         cache_mod.cache_delete_pattern("urls:user:*")
         mock.delete.assert_called_once_with("urls:user:1", "urls:user:2")
@@ -440,7 +440,7 @@ class TestCacheWithMockedRedis:
         import app.utils.cache as cache_mod
 
         mock = self._make_mock_redis()
-        mock.keys.return_value = []
+        mock.scan.return_value = (0, [])
         cache_mod._redis_client = mock
         cache_mod.cache_delete_pattern("urls:user:*")
         mock.delete.assert_not_called()

@@ -34,3 +34,12 @@ Thumbs.db
 judging/
 
 .claude
+# Backups
+backups/
+
+# TLS certs (self-signed)
+nginx/certs/
+
+# Coverage
+coverage.xml
+htmlcov/
