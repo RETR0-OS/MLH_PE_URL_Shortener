@@ -37,13 +37,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y k6
 
-      - name: Load test - Tier 1 (50 VUs)
-        run: k6 run --env SCENARIO=tier1 --env BASE_URL=http://localhost:80 loadtests/k6_test.js
-
-      - name: Load test - Tier 2 (200 VUs)
-        run: k6 run --env SCENARIO=tier2 --env BASE_URL=http://localhost:80 loadtests/k6_test.js
-
-      - name: Load test - Tier 3 (500 VUs)
+      - name: Load test (500 VUs)
         run: k6 run --env SCENARIO=tier3 --env BASE_URL=http://localhost:80 loadtests/k6_test.js
 
       - name: Collect logs on failure
