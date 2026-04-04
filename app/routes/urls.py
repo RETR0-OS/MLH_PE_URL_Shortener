@@ -1,7 +1,10 @@
 import datetime
+import uuid
 
 from flask import Blueprint, jsonify, redirect, request
 from peewee import IntegrityError
+
+from app.database import db
 
 from app.event_writer import log_event
 from app.models.url import Url
@@ -72,17 +75,18 @@ def create_url():
         return jsonify(error="User not found"), 404
 
     now = datetime.datetime.now()
-    url = Url.create(
-        user_id=user_id,
-        short_code="tmp",
-        original_url=original_url.strip(),
-        title=title if isinstance(title, str) else "",
-        is_active=True,
-        created_at=now,
-        updated_at=now,
-    )
-    url.short_code = encode_base62(url.id)
-    url.save()
+    with db.atomic():
+        url = Url.create(
+            user_id=user_id,
+            short_code=uuid.uuid4().hex[:12],
+            original_url=original_url.strip(),
+            title=title if isinstance(title, str) else "",
+            is_active=True,
+            created_at=now,
+            updated_at=now,
+        )
+        url.short_code = encode_base62(url.id)
+        url.save()
 
     log_event(url.id, user_id, "created",
               short_code=url.short_code, original_url=url.original_url)
