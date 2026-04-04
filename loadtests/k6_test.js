@@ -75,7 +75,10 @@ export default function () {
   const createRes = http.post(
     `${BASE_URL}/users`,
     JSON.stringify({ username: tag, email: `${tag}@loadtest.io` }),
-    { headers: { "Content-Type": "application/json" } }
+    {
+      headers: { "Content-Type": "application/json" },
+      responseCallback: http.expectedStatuses(201, 409),
+    }
   );
   check(createRes, {
     "create user 201 or 409": (r) => r.status === 201 || r.status === 409,
