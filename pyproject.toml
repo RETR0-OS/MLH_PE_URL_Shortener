@@ -14,12 +14,20 @@ dependencies = [
     "redis>=5.0",
     "python-json-logger>=3.0",
     "prometheus-flask-exporter>=0.23",
+    "flask-swagger-ui>=4.11",
+    "peewee-migrate>=1.12",
+    "opentelemetry-api>=1.27",
+    "opentelemetry-sdk>=1.27",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.27",
+    "opentelemetry-instrumentation-flask>=0.48b0",
+    "opentelemetry-instrumentation-requests>=0.48b0",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=6.0",
+    "ruff>=0.8",
 ]
 
 [tool.pytest.ini_options]

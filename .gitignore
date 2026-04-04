@@ -32,3 +32,13 @@ Thumbs.db
 
 # Judging (not visible to participants)
 judging/
+
+# Backups
+backups/
+
+# TLS certs (self-signed)
+nginx/certs/
+
+# Coverage
+coverage.xml
+htmlcov/

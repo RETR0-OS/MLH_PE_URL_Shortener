@@ -23,6 +23,10 @@ def _utcnow():
 def list_urls():
     query = Url.select().order_by(Url.id)
 
+    cursor = request.args.get("cursor", type=int)
+    if cursor is not None:
+        query = query.where(Url.id > cursor)
+
     user_id = request.args.get("user_id", type=int)
     if user_id is not None:
         query = query.where(Url.user == user_id)
@@ -30,6 +34,10 @@ def list_urls():
     is_active = request.args.get("is_active")
     if is_active is not None:
         query = query.where(Url.is_active == (is_active.lower() == "true"))
+
+    per_page = request.args.get("per_page", 100, type=int)
+    if cursor is not None:
+        query = query.limit(per_page)
 
     checkpoint("query_build")
     result = [u.to_dict() for u in query]

@@ -22,10 +22,17 @@ def _reset_pk_sequence():
 
 @users_bp.route("/users", methods=["GET"])
 def list_users():
+    cursor = request.args.get("cursor", type=int)
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
 
-    query = User.select().order_by(User.id).paginate(page, per_page)
+    query = User.select().order_by(User.id)
+    if cursor is not None:
+        query = query.where(User.id > cursor)
+        query = query.limit(per_page)
+    else:
+        query = query.paginate(page, per_page)
+
     result = [u.to_dict() for u in query]
     checkpoint("db_query_and_serialize")
     return jsonify(result)

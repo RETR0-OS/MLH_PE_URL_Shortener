@@ -6,3 +6,7 @@ def register_routes(app):
     app.register_blueprint(users_bp)
     app.register_blueprint(urls_bp)
     app.register_blueprint(events_bp)
+
+    app.register_blueprint(users_bp, url_prefix="/v1", name="users_v1")
+    app.register_blueprint(urls_bp, url_prefix="/v1", name="urls_v1")
+    app.register_blueprint(events_bp, url_prefix="/v1", name="events_v1")
