@@ -108,9 +108,9 @@ def delete_user(user_id):
     from app.models.url import Url
 
     with db.atomic():
-        user_url_ids = [u.id for u in Url.select(Url.id).where(Url.user == user_id)]
-        if user_url_ids:
-            Event.update({Event.url: None}).where(Event.url.in_(user_url_ids)).execute()
+        Event.update({Event.url: None}).where(
+            Event.url.in_(Url.select(Url.id).where(Url.user == user_id))
+        ).execute()
         Event.update({Event.user: None}).where(Event.user == user_id).execute()
         Url.delete().where(Url.user == user_id).execute()
         user.delete_instance()
