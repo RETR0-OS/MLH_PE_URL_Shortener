@@ -16,6 +16,11 @@ class Event(BaseModel):
 
     class Meta:
         table_name = "events"
+        indexes = (
+            (("url_id",), False),
+            (("user_id",), False),
+            (("event_type",), False),
+        )
 
     def to_dict(self):
         details = self.details

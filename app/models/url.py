@@ -22,6 +22,10 @@ class Url(BaseModel):
 
     class Meta:
         table_name = "urls"
+        indexes = (
+            (("user_id",), False),
+            (("is_active",), False),
+        )
 
     def to_dict(self):
         return {
