@@ -25,6 +25,10 @@ def create_app():
 
     with db.connection_context():
         db.create_tables([User, Url, Event], safe=True)
+        db.execute_sql(
+            'ALTER TABLE events ALTER COLUMN url_id DROP NOT NULL,'
+            ' ALTER COLUMN user_id DROP NOT NULL'
+        )
 
     from app.routes import register_routes
 

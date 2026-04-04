@@ -153,6 +153,11 @@ def delete_url(url_id):
     except Url.DoesNotExist:
         return jsonify(error="URL not found"), 404
 
-    url.delete_instance(recursive=True)
+    from app.models.event import Event
+
+    with db.atomic():
+        Event.update({Event.url: None}).where(Event.url == url_id).execute()
+        url.delete_instance()
+
     cache_delete(f"url:{url_id}")
     return "", 204
