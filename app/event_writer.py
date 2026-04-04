@@ -4,7 +4,6 @@ import json
 import logging
 import queue
 import threading
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +11,11 @@ _queue = queue.Queue()
 _BATCH_SIZE = 50
 _FLUSH_INTERVAL = 0.5
 _shutdown = threading.Event()
-_SENTINEL = "FLUSH"
+
+
+class _FlushSentinel:
+    def __init__(self):
+        self.done = threading.Event()
 
 
 def _flush(batch):
@@ -34,9 +37,10 @@ def _writer_loop():
     while not _shutdown.is_set():
         try:
             item = _queue.get(timeout=_FLUSH_INTERVAL)
-            if item is _SENTINEL:
+            if isinstance(item, _FlushSentinel):
                 _flush(batch)
                 batch = []
+                item.done.set()
                 continue
             batch.append(item)
             if len(batch) >= _BATCH_SIZE:
@@ -48,7 +52,9 @@ def _writer_loop():
     while not _queue.empty():
         try:
             item = _queue.get_nowait()
-            if item is not _SENTINEL:
+            if isinstance(item, _FlushSentinel):
+                item.done.set()
+            else:
                 batch.append(item)
         except queue.Empty:
             break
@@ -67,32 +73,21 @@ def _shutdown_writer():
 atexit.register(_shutdown_writer)
 
 
-def _build_payload(url_id, user_id, event_type, short_code, original_url, extra):
+def log_event(url_id, user_id, event_type, short_code="", original_url="", extra=None):
     details = {"short_code": short_code, "original_url": original_url}
     if extra:
         details.update(extra)
-    return {
+    _queue.put({
         "url_id": url_id,
         "user_id": user_id,
         "event_type": event_type,
         "timestamp": datetime.datetime.now(),
         "details": json.dumps(details),
-    }
-
-
-def log_event(url_id, user_id, event_type, short_code="", original_url="", extra=None):
-    from app.database import _testing
-
-    payload = _build_payload(url_id, user_id, event_type, short_code, original_url, extra)
-
-    if _testing:
-        from app.models.event import Event
-        Event.create(**payload)
-    else:
-        _queue.put(payload)
+    })
 
 
 def flush_pending():
-    """Force-flush and wait for all queued events to be written."""
-    _queue.put(_SENTINEL)
-    time.sleep(_FLUSH_INTERVAL + 0.3)
+    """Block until all queued events are flushed to the database."""
+    sentinel = _FlushSentinel()
+    _queue.put(sentinel)
+    sentinel.done.wait(timeout=5)

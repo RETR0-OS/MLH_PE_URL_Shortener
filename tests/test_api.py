@@ -126,9 +126,12 @@ def test_update_url(client):
 
 
 def test_events_created_on_url_create(client):
+    from app.event_writer import flush_pending
+
     user_resp = client.post("/users", json={"username": "evtuser", "email": "evtuser@example.com"})
     uid = user_resp.get_json()["id"]
     client.post("/urls", json={"user_id": uid, "original_url": "https://evt.com", "title": "Evt"})
+    flush_pending()
     resp = client.get("/events")
     assert resp.status_code == 200
     events = resp.get_json()
