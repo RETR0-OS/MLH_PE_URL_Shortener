@@ -31,8 +31,10 @@ def create_app():
         )
 
     from app.routes import register_routes
+    from app.utils.cache import warm_up
 
     register_routes(app)
+    warm_up()
 
     @app.route("/health")
     @metrics.do_not_track()

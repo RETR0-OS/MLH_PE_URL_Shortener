@@ -38,21 +38,29 @@ def get_redis():
 
         host = _read_secret("redis_host", "redis")
         port = int(_read_secret("redis_port", "6379"))
-        password = _read_secret("redis_password", None)
+        password = _read_secret("redis_password", None) or None
         _redis_client = redis.Redis(
             host=host,
             port=port,
             password=password,
             decode_responses=True,
-            socket_connect_timeout=2,
-            socket_timeout=2,
+            socket_connect_timeout=0.5,
+            socket_timeout=0.5,
+            retry_on_timeout=True,
+            health_check_interval=30,
         )
         _redis_client.ping()
         return _redis_client
     except Exception:
         logger.warning("Redis unavailable, falling back to DB-only")
+        _redis_client = None
         _open_circuit()
         return None
+
+
+def warm_up():
+    """Eagerly establish the Redis connection at startup."""
+    get_redis()
 
 
 def _open_circuit():
