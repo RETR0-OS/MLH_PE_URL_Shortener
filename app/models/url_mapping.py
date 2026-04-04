@@ -9,5 +9,6 @@ class URLMapping(BaseModel):
     long_url = CharField(max_length=8000)
     created_at = DateTimeField(default=datetime.datetime.now)
     access_count = IntegerField(default=0)
+    
 
     owner = For
