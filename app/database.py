@@ -1,5 +1,4 @@
 import os
-
 from peewee import DatabaseProxy, Model, PostgresqlDatabase
 
 db = DatabaseProxy()
