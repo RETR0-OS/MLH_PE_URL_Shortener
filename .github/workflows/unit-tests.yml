@@ -30,4 +30,4 @@ jobs:
       - name: Run tests with coverage
         env:
           PYTHONPATH: ${{ github.workspace }}
-        run: pytest --cov=app --cov-report=term-missing --cov-fail-under=50 -v
+        run: pytest --cov=app --cov-report=term-missing --cov-fail-under=80 -v
