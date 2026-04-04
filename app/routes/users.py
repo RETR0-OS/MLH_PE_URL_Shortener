@@ -90,6 +90,17 @@ def update_user(user_id):
     return jsonify(user.to_dict())
 
 
+@users_bp.route("/users/<int:user_id>", methods=["DELETE"])
+def delete_user(user_id):
+    try:
+        user = User.get_by_id(user_id)
+    except User.DoesNotExist:
+        return jsonify(error="User not found"), 404
+
+    user.delete_instance(recursive=True)
+    return "", 204
+
+
 @users_bp.route("/users/bulk", methods=["POST"])
 def bulk_load_users():
     if "file" not in request.files:
