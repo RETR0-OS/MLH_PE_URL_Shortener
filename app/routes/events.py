@@ -67,14 +67,3 @@ def get_event(event_id):
         return jsonify(error="Event not found"), 404
 
     return jsonify(event.to_dict())
-
-
-@events_bp.route("/events/<int:event_id>", methods=["DELETE"])
-def delete_event(event_id):
-    try:
-        event = Event.get_by_id(event_id)
-    except Event.DoesNotExist:
-        return jsonify(error="Event not found"), 404
-
-    event.delete_instance()
-    return "", 204
