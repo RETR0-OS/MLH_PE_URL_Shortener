@@ -268,7 +268,9 @@ jobs:
             curl -sf http://localhost:80/health > /dev/null 2>&1 || true
             curl -sf http://localhost:80/health > /dev/null 2>&1 || true
             for attempt in $(seq 1 12); do
-              LOKI_LOGS=$(curl -sf "http://localhost:3100/loki/api/v1/query?query=%7Bjob%3D%22app%22%7D&limit=5" 2>/dev/null || echo "{}")
+              END=$(date -u +%s)000000000
+              START=$(( $(date -u +%s) - 300 ))000000000
+              LOKI_LOGS=$(curl -sf "http://localhost:3100/loki/api/v1/query_range?query=%7Bjob%3D%22app%22%7D&limit=5&start=${START}&end=${END}" 2>/dev/null || echo "{}")
               HAS_LOGS=$(echo "$LOKI_LOGS" | json_check "
           import sys,json
           data=json.load(sys.stdin)
