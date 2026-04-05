@@ -279,7 +279,7 @@ def main():
     # 12. PUT /users/:id (update)
     results.append(run_benchmark(
         client, "update_user", "put", f"/users/{target_user}",
-        data=json.dumps({"username": f"updated_bench_u0"}),
+        data=json.dumps({"username": "updated_bench_u0"}),
         content_type="application/json",
     ))
 
