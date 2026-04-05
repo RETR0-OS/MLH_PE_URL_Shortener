@@ -168,13 +168,11 @@ services:
           memory: 64M
 
   jaeger:
-    image: jaegertracing/all-in-one:latest
+    image: jaegertracing/jaeger:2.16.0
     ports:
       - "16686:16686"
       - "4317:4317"
       - "4318:4318"
-    environment:
-      COLLECTOR_OTLP_ENABLED: "true"
     restart: unless-stopped
     deploy:
       resources:
