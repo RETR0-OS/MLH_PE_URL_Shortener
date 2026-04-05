@@ -136,7 +136,14 @@ title: Home
   <div class="hero-btns">
     <a class="btn btn-green" href="https://github.com/RETR0-OS/MLH_PE_URL_Shortener" target="_blank">⭐ GitHub Repo</a>
     <a class="btn btn-dark" href="http://64.225.10.147/docs/" target="_blank">📄 API Docs</a>
+    <a class="btn btn-dark" href="http://64.225.10.147/" target="_blank">🖥️ Live Dashboard</a>
   </div>
+  <p style="margin-top: 18px; font-size: 13px; color: #8b949e;">
+    Live endpoints:
+    <a href="http://64.225.10.147/health" target="_blank" style="color:#58a6ff;">/health</a> ·
+    <a href="http://64.225.10.147/health/ready" target="_blank" style="color:#58a6ff;">/health/ready</a> ·
+    <a href="http://64.225.10.147/docs/" target="_blank" style="color:#58a6ff;">/docs</a>
+  </p>
 </div>
 
 <div class="section-label">Tracks</div>
