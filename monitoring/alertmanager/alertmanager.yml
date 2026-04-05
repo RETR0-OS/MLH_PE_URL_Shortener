@@ -1,15 +1,33 @@
 global:
   resolve_timeout: 5m
+  smtp_smarthost: "smtp.gmail.com:587"
+  smtp_from: "alertmanager@urlshortener.local"
+  smtp_auth_username: ""
+  smtp_auth_password: ""
+  smtp_require_tls: true
 
 route:
-  group_by: ["alertname"]
-  group_wait: 30s
-  group_interval: 5m
+  group_by: ["alertname", "severity"]
+  group_wait: 10s
+  group_interval: 1m
   repeat_interval: 1h
-  receiver: "discord"
+  receiver: "email-warnings"
+  routes:
+    - match:
+        severity: critical
+      receiver: "email-critical"
+      group_wait: 0s
 
 receivers:
-  - name: "discord"
-    webhook_configs:
-      - url: "http://localhost:9093/api/v2/alerts"
+  - name: "email-critical"
+    email_configs:
+      - to: "oncall@urlshortener.local"
         send_resolved: true
+        headers:
+          Subject: 'CRITICAL: {{ .GroupLabels.alertname }} firing'
+  - name: "email-warnings"
+    email_configs:
+      - to: "oncall@urlshortener.local"
+        send_resolved: true
+        headers:
+          Subject: 'WARNING: {{ .GroupLabels.alertname }} firing'

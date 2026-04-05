@@ -205,6 +205,10 @@ services:
       - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     ports:
       - "9093:9093"
+    environment:
+      ALERT_EMAIL_FROM: "${ALERT_EMAIL_FROM:-alertmanager@urlshortener.local}"
+      ALERT_EMAIL_PASSWORD: "${ALERT_EMAIL_PASSWORD:-}"
+      ALERT_EMAIL_TO: "${ALERT_EMAIL_TO:-oncall@urlshortener.local}"
     restart: unless-stopped
     deploy:
       resources:
