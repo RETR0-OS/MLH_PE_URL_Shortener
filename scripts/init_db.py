@@ -10,6 +10,7 @@ from app.models.user import User
 init_db_standalone()
 
 with db.connection_context():
+    db.execute_sql("CREATE EXTENSION IF NOT EXISTS btree_gin")
     db.create_tables([User, Url, Event], safe=True)
     db.execute_sql(
         "ALTER TABLE events ALTER COLUMN url_id DROP NOT NULL,"
