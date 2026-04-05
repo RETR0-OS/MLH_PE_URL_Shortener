@@ -132,31 +132,31 @@ title: Home
   <p class="hero-sub">A production-grade URL shortening service built with reliability, scalability, and observability from day one.</p>
   <div class="hero-btns">
     <a class="btn btn-green" href="https://github.com/RETR0-OS/MLH_PE_URL_Shortener" target="_blank">⭐ GitHub Repo</a>
-    <a class="btn btn-dark" href="openapi.yaml" target="_blank">📄 OpenAPI Spec</a>
+    <a class="btn btn-dark" href="{{ site.baseurl }}/api">📄 API Docs</a>
   </div>
 </div>
 
 <div class="section-label">Tracks</div>
 <div class="tracks">
-  <a class="card" href="Reliability/RELIABILITY_ENGINEERING">
+  <a class="card" href="{{ site.baseurl }}/Reliability/RELIABILITY_ENGINEERING.md">
     <div class="card-icon">🛡️</div>
     <div class="card-title">Reliability Engineering</div>
     <div class="card-desc">CI/CD pipeline, 91% test coverage, chaos engineering, container restart policies, and failure modes.</div>
     <div class="card-arrow">Read docs →</div>
   </a>
-  <a class="card" href="TRACK2_SCALABILITY_ENGINEERING">
+  <a class="card" href="{{ site.baseurl }}/TRACK2_SCALABILITY_ENGINEERING.md">
     <div class="card-icon">🚀</div>
     <div class="card-title">Scalability Engineering</div>
     <div class="card-desc">500 VU k6 load tests, Nginx load balancing, Redis caching, horizontal scaling, and bottleneck analysis.</div>
     <div class="card-arrow">Read docs →</div>
   </a>
-  <a class="card" href="TRACK3_INCIDENT_RESPONSE">
+  <a class="card" href="{{ site.baseurl }}/TRACK3_INCIDENT_RESPONSE.md">
     <div class="card-icon">🚨</div>
     <div class="card-title">Incident Response</div>
     <div class="card-desc">Prometheus alerting, Grafana dashboards, Loki log aggregation, Jaeger tracing, and RCA documentation.</div>
     <div class="card-arrow">Read docs →</div>
   </a>
-  <a class="card" href="TRACK4_DOCUMENTATION">
+  <a class="card" href="{{ site.baseurl }}/TRACK4_DOCUMENTATION.md">
     <div class="card-icon">📜</div>
     <div class="card-title">Documentation</div>
     <div class="card-desc">Architecture diagrams, API docs, deploy guide, runbook, decision log, and capacity plan.</div>
@@ -166,33 +166,33 @@ title: Home
 
 <div class="section-label">Reference Docs</div>
 <div class="refs">
-  <a class="ref-item" href="DEPLOYMENT">
+  <a class="ref-item" href="{{ site.baseurl }}/DEPLOYMENT.md">
     <div class="ref-name">Deploy Guide</div>
     <div class="ref-desc">How to deploy and rollback</div>
   </a>
-  <a class="ref-item" href="ARCHITECTURE">
+  <a class="ref-item" href="{{ site.baseurl }}/ARCHITECTURE.md">
     <div class="ref-name">Architecture</div>
     <div class="ref-desc">System design and component diagram</div>
   </a>
-  <a class="ref-item" href="Reliability/RELIABILITY_ENGINEERING#failure-modes-documentation">
+  <a class="ref-item" href="{{ site.baseurl }}/Reliability/RELIABILITY_ENGINEERING.md#failure-modes-documentation">
     <div class="ref-name">Failure Modes</div>
     <div class="ref-desc">Every failure, detection, and recovery</div>
   </a>
-  <a class="ref-item" href="Reliability/RELIABILITY_ENGINEERING#error-handling-documentation">
+  <a class="ref-item" href="{{ site.baseurl }}/Reliability/RELIABILITY_ENGINEERING.md#error-handling-documentation">
     <div class="ref-name">Error Handling</div>
     <div class="ref-desc">All error codes and response shapes</div>
   </a>
-  <a class="ref-item" href="TRACK4_DOCUMENTATION#decision-log">
+  <a class="ref-item" href="{{ site.baseurl }}/TRACK4_DOCUMENTATION.md#decision-log">
     <div class="ref-name">Decision Log</div>
     <div class="ref-desc">Why we chose Redis, Nginx, Gunicorn</div>
   </a>
-  <a class="ref-item" href="TRACK2_SCALABILITY_ENGINEERING#bottleneck-analysis">
+  <a class="ref-item" href="{{ site.baseurl }}/TRACK2_SCALABILITY_ENGINEERING.md#bottleneck-analysis">
     <div class="ref-name">Bottleneck Report</div>
     <div class="ref-desc">What was slow and how we fixed it</div>
   </a>
-  <a class="ref-item" href="openapi.yaml">
-    <div class="ref-name">OpenAPI Spec</div>
-    <div class="ref-desc">Full API reference (YAML)</div>
+  <a class="ref-item" href="{{ site.baseurl }}/api">
+    <div class="ref-name">API Docs</div>
+    <div class="ref-desc">Interactive Swagger UI</div>
   </a>
 </div>
 
