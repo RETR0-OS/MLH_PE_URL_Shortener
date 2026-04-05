@@ -31,7 +31,13 @@ def list_events():
     per_page = request.args.get("per_page", 100, type=int)
     query = query.limit(per_page)
 
-    return jsonify([e.to_dict() for e in query])
+    rows = list(query.dicts())
+    for r in rows:
+        r["url_id"] = r.pop("url", None)
+        r["user_id"] = r.pop("user", None)
+        if r.get("timestamp"):
+            r["timestamp"] = r["timestamp"].isoformat()
+    return jsonify(rows)
 
 
 @events_bp.route("/events/<int:event_id>", methods=["GET"])

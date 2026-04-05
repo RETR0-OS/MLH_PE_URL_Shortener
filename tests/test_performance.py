@@ -5,16 +5,25 @@ import logging
 
 
 class QueryCounter:
-    """Counts SQL queries executed by Peewee during a block."""
+    """Counts SELECT queries executed by Peewee during a block.
+
+    Only counts SELECTs to avoid false positives from background
+    thread writes (event_writer) hitting the shared peewee logger.
+    """
 
     def __init__(self):
         self.count = 0
         self._logger = logging.getLogger("peewee")
         self._handler = None
 
+    def _on_emit(self, record):
+        msg = str(getattr(record, "msg", ""))
+        if "SELECT" in msg:
+            self.count += 1
+
     def __enter__(self):
         self._handler = logging.Handler()
-        self._handler.emit = lambda record: setattr(self, "count", self.count + 1)
+        self._handler.emit = self._on_emit
         self._logger.addHandler(self._handler)
         self._logger.setLevel(logging.DEBUG)
         return self

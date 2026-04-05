@@ -24,7 +24,7 @@ def register_middleware(app):
     @app.before_request
     def _inject_request_id():
         now = time.monotonic()
-        g.request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+        g.request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
         g.request_start = now
         g._last_checkpoint = now
         g.timings = []

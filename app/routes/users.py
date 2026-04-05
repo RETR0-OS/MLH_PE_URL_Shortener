@@ -33,9 +33,12 @@ def list_users():
     else:
         query = query.paginate(page, per_page)
 
-    result = [u.to_dict() for u in query]
+    rows = list(query.dicts())
+    for r in rows:
+        if r.get("created_at"):
+            r["created_at"] = r["created_at"].isoformat()
     checkpoint("db_query_and_serialize")
-    return jsonify(result)
+    return jsonify(rows)
 
 
 @users_bp.route("/users", methods=["POST"])
@@ -137,11 +140,15 @@ def update_user(user_id):
 
     try:
         with db.atomic():
+            dirty = []
             if "username" in data:
                 user.username = data["username"]
+                dirty.append(User.username)
             if "email" in data:
                 user.email = data["email"]
-            user.save()
+                dirty.append(User.email)
+            if dirty:
+                user.save(only=dirty)
     except IntegrityError as exc:
         return jsonify({"error": str(exc)}), 422
 

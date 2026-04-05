@@ -71,6 +71,9 @@ services:
       -c effective_cache_size=384MB
       -c maintenance_work_mem=64MB
       -c max_connections=100
+      -c wal_buffers=16MB
+      -c checkpoint_completion_target=0.9
+      -c synchronous_commit=off
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
