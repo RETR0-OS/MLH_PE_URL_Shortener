@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>URL Shortener — Production Ops</title>
+  <link rel="stylesheet" href="/static/dashboard/style.css" />
+</head>
+<body>
+
+<!-- ARIA live region for screen-reader announcements -->
+<div id="aria-live" aria-live="polite" aria-atomic="true" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);"></div>
+
+<!-- ================================================================
+     TOP BAR
+     ================================================================ -->
+<header class="topbar" role="banner">
+  <div class="topbar-brand">
+    <span>URL Shortener</span> — Production Ops
+  </div>
+
+  <span id="health-pill" class="health-pill health-down" role="status" aria-label="System health status">
+    Checking...
+  </span>
+
+  <div class="topbar-right">
+    <input
+      id="api-key-input"
+      type="password"
+      class="api-key-input"
+      placeholder="X-API-Key (optional)"
+      autocomplete="off"
+      aria-label="API key — saved to localStorage on blur"
+      title="Optional. Sent as X-API-Key header on every request."
+    />
+
+    <nav class="obs-links" aria-label="Observability services">
+      <a class="obs-link" href="/docs/" target="_blank" rel="noopener">Swagger</a>
+      <a class="obs-link" href="http://64.225.10.147:3000" target="_blank" rel="noopener">Grafana</a>
+      <a class="obs-link" href="http://64.225.10.147:16686" target="_blank" rel="noopener">Jaeger</a>
+      <a class="obs-link" href="http://64.225.10.147:9090" target="_blank" rel="noopener">Prometheus</a>
+      <a class="obs-link" href="http://64.225.10.147:9093" target="_blank" rel="noopener">Alertmgr</a>
+      <a class="obs-link" href="/metrics" target="_blank" rel="noopener">Metrics</a>
+    </nav>
+
+    <button id="refresh-all-btn" class="refresh-btn" aria-label="Refresh all data">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+        <polyline points="23 4 23 10 17 10"/>
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+      </svg>
+      Refresh all
+    </button>
+  </div>
+</header>
+
+<!-- ================================================================
+     MAIN CONTENT
+     ================================================================ -->
+<main class="main" id="main-content">
+
+  <!-- ---- Stats strip ---- -->
+  <section class="stats-strip" aria-label="System statistics">
+
+    <div class="stat-card" role="region" aria-label="Total users">
+      <div class="stat-label">Total Users</div>
+      <div class="stat-value" id="stat-users">—<span class="stat-dot"></span></div>
+    </div>
+
+    <div class="stat-card" role="region" aria-label="Total URLs">
+      <div class="stat-label">Total URLs</div>
+      <div class="stat-value" id="stat-urls">—<span class="stat-dot"></span></div>
+    </div>
+
+    <div class="stat-card" role="region" aria-label="Audit events">
+      <div class="stat-label">Audit Events</div>
+      <div class="stat-value" id="stat-events">—<span class="stat-dot"></span></div>
+    </div>
+
+    <div class="stat-card" role="region" aria-label="Dashboard uptime">
+      <div class="stat-label">Dashboard Uptime</div>
+      <div class="stat-value" id="stat-uptime">0m 00s</div>
+    </div>
+
+  </section>
+
+  <!-- ---- Three-panel grid ---- -->
+  <div class="panels-grid">
+
+    <!-- ======== Users Panel ======== -->
+    <section class="panel" aria-label="Users management">
+      <div class="panel-header">
+        <h2 class="panel-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="vertical-align:middle;margin-right:5px;">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          Users
+        </h2>
+      </div>
+      <div class="panel-content">
+
+        <!-- Create user form -->
+        <form id="create-user-form" class="inline-form" aria-label="Create new user">
+          <input
+            type="text"
+            name="username"
+            placeholder="Username"
+            required
+            autocomplete="off"
+            aria-label="New user username"
+          />
+          <input
+            type="email"
+            name="email"
+            placeholder="Email"
+            required
+            autocomplete="off"
+            aria-label="New user email"
+          />
+          <button type="submit" class="btn-primary">Create</button>
+        </form>
+
+        <!-- Active user chip (hidden when no filter) -->
+        <span id="active-user-chip" class="active-chip" style="display:none;" aria-live="polite"></span>
+
+        <!-- Users table -->
+        <div class="table-wrapper" role="region" aria-label="Users list" tabindex="0">
+          <table id="users-table" aria-label="Users">
+            <thead>
+              <tr>
+                <th data-col="id" scope="col" aria-sort="ascending" title="Sort by ID">
+                  ID<span class="sort-icon"> ▲</span>
+                </th>
+                <th data-col="username" scope="col" aria-sort="none" title="Sort by username">
+                  Username<span class="sort-icon"> ⬍</span>
+                </th>
+                <th data-col="email" scope="col" aria-sort="none" title="Sort by email">
+                  Email<span class="sort-icon"> ⬍</span>
+                </th>
+                <th data-col="created_at" scope="col" aria-sort="none" title="Sort by date">
+                  Created<span class="sort-icon"> ⬍</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody" role="rowgroup">
+              <tr><td colspan="4" class="empty-row">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="muted" style="font-size:11px;margin-top:6px;">
+          Click a row to filter URLs by that user.
+        </p>
+      </div>
+    </section>
+
+    <!-- ======== URLs Panel ======== -->
+    <section class="panel" aria-label="URL management">
+      <div class="panel-header">
+        <h2 class="panel-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="vertical-align:middle;margin-right:5px;">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>
+          URLs
+        </h2>
+      </div>
+      <div class="panel-content">
+
+        <!-- Create URL form -->
+        <form id="create-url-form" class="inline-form" aria-label="Create new URL">
+          <input
+            type="number"
+            name="user_id"
+            placeholder="User ID"
+            required
+            min="1"
+            style="width:80px;flex:none;"
+            aria-label="User ID for new URL"
+            id="url-user-id"
+          />
+          <input
+            type="url"
+            name="original_url"
+            placeholder="https://original-url.com"
+            required
+            style="flex:2;"
+            aria-label="Original URL to shorten"
+          />
+          <input
+            type="text"
+            name="title"
+            placeholder="Title (optional)"
+            style="flex:1;"
+            aria-label="Optional title for URL"
+          />
+          <button type="submit" class="btn-primary">Create</button>
+        </form>
+
+        <!-- Filter row -->
+        <div class="filter-row" role="search" aria-label="Filter URLs">
+          <label for="url-filter-user">User:</label>
+          <select id="url-filter-user" aria-label="Filter by user">
+            <option value="">All users</option>
+          </select>
+
+          <label for="url-filter-active">Status:</label>
+          <select id="url-filter-active" aria-label="Filter by active status">
+            <option value="">All</option>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+        </div>
+
+        <!-- URLs table -->
+        <div class="table-wrapper" role="region" aria-label="URLs list" tabindex="0">
+          <table id="urls-table" aria-label="URLs">
+            <thead>
+              <tr>
+                <th data-col="short_code" scope="col" aria-sort="none" title="Sort by short code">
+                  Code<span class="sort-icon"> ⬍</span>
+                </th>
+                <th data-col="original_url" scope="col" aria-sort="none" title="Sort by original URL">
+                  Original URL<span class="sort-icon"> ⬍</span>
+                </th>
+                <th data-col="title" scope="col" aria-sort="none">Title</th>
+                <th data-col="is_active" scope="col" aria-sort="none">Status</th>
+                <th data-col="created_at" scope="col" aria-sort="none">Created</th>
+                <th scope="col" aria-label="Actions"></th>
+              </tr>
+            </thead>
+            <tbody id="urls-tbody" role="rowgroup">
+              <tr><td colspan="6" class="empty-row">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ======== Events Panel ======== -->
+    <section class="panel" aria-label="Audit event feed">
+      <div class="panel-header">
+        <h2 class="panel-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="vertical-align:middle;margin-right:5px;">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+          Events
+        </h2>
+        <div class="events-controls">
+          <span id="events-new-badge" class="events-new-badge" role="status" aria-live="polite" tabindex="0" style="display:none;">+0 new</span>
+          <button id="pause-events-btn" class="btn-primary" aria-label="Pause or resume event polling" style="padding:3px 10px;font-size:11px;">Pause</button>
+        </div>
+      </div>
+      <div class="panel-content" style="padding:8px;">
+        <div
+          id="events-list"
+          class="events-scroll-area"
+          role="log"
+          aria-label="Live audit event feed"
+          aria-live="off"
+          tabindex="0"
+        >
+          <div class="empty-row">Loading events...</div>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /panels-grid -->
+
+  <!-- ================================================================
+       API TESTER
+       ================================================================ -->
+  <section class="tester-section" aria-label="API tester">
+    <div
+      id="tester-header"
+      class="tester-header"
+      role="button"
+      tabindex="0"
+      aria-expanded="false"
+      aria-controls="tester-body"
+    >
+      <span class="tester-header-title">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="vertical-align:middle;margin-right:6px;">
+          <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+        </svg>
+        API Tester
+      </span>
+      <span class="tester-toggle muted" aria-hidden="true">▼</span>
+    </div>
+
+    <div id="tester-body" class="tester-body" role="region">
+
+      <div class="tester-controls">
+        <select id="tester-method" aria-label="HTTP method">
+          <option>GET</option>
+          <option>POST</option>
+          <option>PUT</option>
+          <option>DELETE</option>
+        </select>
+
+        <input
+          id="tester-path"
+          type="text"
+          list="tester-endpoints"
+          value="/health"
+          placeholder="/path"
+          aria-label="API path"
+          autocomplete="off"
+        />
+        <datalist id="tester-endpoints">
+          <option value="/health"></option>
+          <option value="/health/ready"></option>
+          <option value="/users"></option>
+          <option value="/users/1"></option>
+          <option value="/urls"></option>
+          <option value="/urls?is_active=true"></option>
+          <option value="/urls/1"></option>
+          <option value="/events?per_page=50"></option>
+          <option value="/users?per_page=100"></option>
+          <option value="/urls?per_page=100"></option>
+          <option value="/metrics"></option>
+          <option value="/apispec.json"></option>
+        </datalist>
+
+        <button id="tester-send-btn" class="btn-primary" aria-label="Send API request (Ctrl+Enter or Cmd+Enter)">
+          Send
+        </button>
+        <span class="tester-hint muted" style="font-size:11px;">Cmd/Ctrl+Enter to send</span>
+      </div>
+
+      <div id="tester-body-wrapper" class="tester-body-wrapper" style="display:none;">
+        <textarea
+          id="tester-body-input"
+          placeholder='{"key": "value"}'
+          aria-label="Request body JSON"
+          spellcheck="false"
+        ></textarea>
+        <div class="muted" style="font-size:11px;margin-top:4px;">JSON body (POST / PUT only)</div>
+      </div>
+
+      <div id="tester-response" class="tester-response muted" aria-live="polite">
+        Enter a path and click Send.
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================================================================
+       PRODUCTION FEATURES SHOWCASE
+       ================================================================ -->
+  <section aria-label="Production features">
+    <p class="section-label" style="margin-bottom:12px;">Production-Grade Observability</p>
+    <div class="obs-strip">
+
+      <a href="http://64.225.10.147:16686" target="_blank" rel="noopener"
+         class="obs-card" style="--accent:var(--cyan);" aria-label="Jaeger distributed tracing">
+        <div class="obs-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/>
+            <line x1="12" y1="7" x2="5" y2="17"/><line x1="12" y1="7" x2="19" y2="17"/>
+          </svg>
+        </div>
+        <div class="obs-card-title">Distributed Tracing</div>
+        <div class="obs-card-desc">Jaeger — end-to-end request spans across all services with OpenTelemetry.</div>
+      </a>
+
+      <a href="http://64.225.10.147:3000" target="_blank" rel="noopener"
+         class="obs-card" style="--accent:var(--amber);" aria-label="Grafana dashboards">
+        <div class="obs-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+          </svg>
+        </div>
+        <div class="obs-card-title">Metrics &amp; Dashboards</div>
+        <div class="obs-card-desc">Grafana — live visualisation of latency, throughput, and error rates.</div>
+      </a>
+
+      <a href="http://64.225.10.147:9090" target="_blank" rel="noopener"
+         class="obs-card" style="--accent:var(--red);" aria-label="Prometheus metrics">
+        <div class="obs-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+        </div>
+        <div class="obs-card-title">Prometheus</div>
+        <div class="obs-card-desc">Time-series metrics store with alert rules and recording rules configured.</div>
+      </a>
+
+      <a href="http://64.225.10.147:9093" target="_blank" rel="noopener"
+         class="obs-card" style="--accent:var(--amber);" aria-label="Alertmanager">
+        <div class="obs-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+        </div>
+        <div class="obs-card-title">Alertmanager</div>
+        <div class="obs-card-desc">Incident routing and deduplication — alerts fire on SLA breach or errors.</div>
+      </a>
+
+      <a href="/docs/" target="_blank" rel="noopener"
+         class="obs-card" style="--accent:var(--green);" aria-label="Swagger API documentation">
+        <div class="obs-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+        </div>
+        <div class="obs-card-title">API Documentation</div>
+        <div class="obs-card-desc">Swagger UI — interactive OpenAPI 3 spec with try-it-out for all endpoints.</div>
+      </a>
+
+      <a href="/metrics" target="_blank" rel="noopener"
+         class="obs-card" style="--accent:var(--blue);" aria-label="Raw Prometheus metrics">
+        <div class="obs-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <line x1="8" y1="6" x2="21" y2="6"/>
+            <line x1="8" y1="12" x2="21" y2="12"/>
+            <line x1="8" y1="18" x2="21" y2="18"/>
+            <line x1="3" y1="6" x2="3.01" y2="6"/>
+            <line x1="3" y1="12" x2="3.01" y2="12"/>
+            <line x1="3" y1="18" x2="3.01" y2="18"/>
+          </svg>
+        </div>
+        <div class="obs-card-title">Raw Metrics</div>
+        <div class="obs-card-desc">Prometheus text-format exposition — all counters, gauges, and histograms.</div>
+      </a>
+
+    </div>
+  </section>
+
+</main><!-- /main -->
+
+<!-- Toast container -->
+<div id="toast-container" role="region" aria-label="Notifications"></div>
+
+<script type="module" src="/static/dashboard/app.js"></script>
+</body>
+</html>

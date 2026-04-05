@@ -11,3 +11,8 @@ class TestHealth:
         resp = client.get("/health/ready")
         assert resp.status_code == 200
         assert resp.get_json()["status"] == "ok"
+
+    def test_dashboard_root(self, client):
+        resp = client.get("/")
+        assert resp.status_code == 200
+        assert "text/html" in resp.content_type

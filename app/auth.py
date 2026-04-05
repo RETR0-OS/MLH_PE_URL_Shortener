@@ -12,7 +12,15 @@ from flask import jsonify, request
 logger = logging.getLogger(__name__)
 
 EXEMPT_PATHS = frozenset(
-    {"/health", "/health/ready", "/nginx-status", "/docs", "/docs/", "/apispec.json"}
+    {
+        "/",
+        "/health",
+        "/health/ready",
+        "/nginx-status",
+        "/docs",
+        "/docs/",
+        "/apispec.json",
+    }
 )
 
 
@@ -26,7 +34,11 @@ def register_api_key_auth(app):
 
     @app.before_request
     def _check_api_key():
-        if request.path in EXEMPT_PATHS or request.path.startswith("/docs/"):
+        if (
+            request.path in EXEMPT_PATHS
+            or request.path.startswith("/docs/")
+            or request.path.startswith("/static/")
+        ):
             return None
         if request.method == "OPTIONS":
             return None
