@@ -15,7 +15,7 @@ This document records every design decision made for Track 3 (Incident Response)
 4. [Silver Tier Decisions](#silver-tier-decisions)
 5. [Gold Tier Decisions](#gold-tier-decisions)
 6. [Architecture Overview](#architecture-overview)
-7. [Known Gaps](#known-gaps)
+7. [File Index](#file-index)
 
 ---
 
@@ -390,20 +390,6 @@ Distributed tracing via Jaeger + OpenTelemetry showing request traces across ser
 > **Visual evidence:**
 >
 > ![Jaeger Tracing](screenshots/jaeger-tracing.png)
-
----
-
-## Known Gaps
-
-These are factual observations about what is not implemented. They are documented here for transparency.
-
-| Gap | Description | Impact |
-|---|---|---|
-| Autoscaler logging format | `autoscaler/scaler.py` uses `logging.basicConfig` with plain-text format, not JSON. All other components use JSON logging. | Autoscaler logs are not parseable by the same JSON pipeline. Minor — autoscaler is a sidecar, not the main app. |
-| Discord not active by default | `DISCORD_WEBHOOK_URL` is not set in `.env`. Discord receivers exist in code but are dormant. | Email is the active channel. Discord works if the env var is populated. |
-| `docs/ARCHITECTURE.md` is empty | The file exists but has 0 bytes. | No impact on Track 3, but a dangling reference. |
-| No infrastructure-specific dashboards | Only one Grafana dashboard exists (`url-shortener-golden`). No separate dashboards for PostgreSQL, Redis, or Nginx. | Application golden signals are covered. Infrastructure monitoring relies on alert rules (RedisDown, etc.) rather than dedicated dashboards. |
-| Alertmanager HTML links use localhost | Email templates link to `http://localhost:9093`, `http://localhost:3000`, `http://localhost:9090`. These only work when the operator is on the same machine. | Acceptable for hackathon/demo. Would need DNS/IP updates for remote deployment. |
 
 ---
 
