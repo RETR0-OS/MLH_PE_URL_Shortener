@@ -4,6 +4,7 @@ Usage:
     python -m app.migrate          # run all pending migrations
     python -m app.migrate create   # create a new empty migration
 """
+
 import sys
 import logging
 

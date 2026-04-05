@@ -1,4 +1,5 @@
 """Integration tests for all untested routes and edge cases."""
+
 import json
 import time
 
@@ -85,9 +86,7 @@ class TestRedirectShortCode:
     def test_successful_redirect_returns_302(self, client):
         user = _make_user(client)
         url = _make_url(client, user["id"])
-        resp = client.get(
-            f"/urls/{url['short_code']}/redirect", follow_redirects=False
-        )
+        resp = client.get(f"/urls/{url['short_code']}/redirect", follow_redirects=False)
         assert resp.status_code == 302
         assert resp.headers["Location"] == "https://example.com"
 
@@ -104,9 +103,7 @@ class TestRedirectShortCode:
             data=json.dumps({"is_active": False}),
             content_type="application/json",
         )
-        resp = client.get(
-            f"/urls/{url['short_code']}/redirect", follow_redirects=False
-        )
+        resp = client.get(f"/urls/{url['short_code']}/redirect", follow_redirects=False)
         assert resp.status_code == 410
         assert resp.get_json()["error"] == "URL is deactivated"
 

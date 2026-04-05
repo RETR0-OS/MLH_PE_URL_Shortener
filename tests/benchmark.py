@@ -7,6 +7,7 @@ across all major endpoints. Outputs a JSON report for comparison.
 Usage:
     uv run python tests/benchmark.py [--output results.json]
 """
+
 import json
 import math
 import os
@@ -79,7 +80,9 @@ def run_benchmark(client, name, method, path, iterations=ITERATIONS, **kwargs):
         "path": path,
         "iterations": iterations,
         "wall_time_s": round(wall_elapsed, 4),
-        "throughput_rps": round(iterations / wall_elapsed, 2) if wall_elapsed > 0 else 0,
+        "throughput_rps": round(iterations / wall_elapsed, 2)
+        if wall_elapsed > 0
+        else 0,
         "latency_ms": {
             "avg": round(statistics.mean(latencies), 3),
             "p50": round(percentile(latencies, 50), 3),
@@ -111,11 +114,13 @@ def seed_data(client):
         for j in range(SEED_URLS_PER_USER):
             resp = client.post(
                 "/urls",
-                data=json.dumps({
-                    "user_id": uid,
-                    "original_url": f"https://example.com/{uid}/{j}",
-                    "title": f"Bench URL {uid}-{j}",
-                }),
+                data=json.dumps(
+                    {
+                        "user_id": uid,
+                        "original_url": f"https://example.com/{uid}/{j}",
+                        "title": f"Bench URL {uid}-{j}",
+                    }
+                ),
                 content_type="application/json",
             )
             url_data = resp.get_json()
@@ -165,6 +170,7 @@ def main():
 
     # 5. POST /users (create)
     create_user_counter = [0]
+
     def bench_create_user():
         i = create_user_counter[0]
         create_user_counter[0] += 1
@@ -188,30 +194,38 @@ def main():
         status_counts[code] = status_counts.get(code, 0) + 1
     wall_elapsed = time.perf_counter() - wall_start
     latencies.sort()
-    results.append({
-        "name": "create_user",
-        "method": "POST",
-        "path": "/users",
-        "iterations": ITERATIONS,
-        "wall_time_s": round(wall_elapsed, 4),
-        "throughput_rps": round(ITERATIONS / wall_elapsed, 2),
-        "latency_ms": {
-            "avg": round(statistics.mean(latencies), 3),
-            "p50": round(percentile(latencies, 50), 3),
-            "p95": round(percentile(latencies, 95), 3),
-            "p99": round(percentile(latencies, 99), 3),
-            "min": round(min(latencies), 3),
-            "max": round(max(latencies), 3),
-            "stdev": round(statistics.stdev(latencies), 3) if len(latencies) > 1 else 0,
-        },
-        "status_codes": status_counts,
-    })
+    results.append(
+        {
+            "name": "create_user",
+            "method": "POST",
+            "path": "/users",
+            "iterations": ITERATIONS,
+            "wall_time_s": round(wall_elapsed, 4),
+            "throughput_rps": round(ITERATIONS / wall_elapsed, 2),
+            "latency_ms": {
+                "avg": round(statistics.mean(latencies), 3),
+                "p50": round(percentile(latencies, 50), 3),
+                "p95": round(percentile(latencies, 95), 3),
+                "p99": round(percentile(latencies, 99), 3),
+                "min": round(min(latencies), 3),
+                "max": round(max(latencies), 3),
+                "stdev": round(statistics.stdev(latencies), 3)
+                if len(latencies) > 1
+                else 0,
+            },
+            "status_codes": status_counts,
+        }
+    )
 
     # 6. GET /urls (list)
     results.append(run_benchmark(client, "list_urls", "get", "/urls"))
 
     # 7. GET /urls?user_id=X (filtered list)
-    results.append(run_benchmark(client, "list_urls_filtered", "get", f"/urls?user_id={user_ids[0]}"))
+    results.append(
+        run_benchmark(
+            client, "list_urls_filtered", "get", f"/urls?user_id={user_ids[0]}"
+        )
+    )
 
     # 8. GET /urls/:id (single, tests cache path)
     target_url = url_ids[0]
@@ -219,17 +233,20 @@ def main():
 
     # 9. POST /urls (create)
     create_url_counter = [0]
+
     def bench_create_url():
         i = create_url_counter[0]
         create_url_counter[0] += 1
         uid = user_ids[i % len(user_ids)]
         return client.post(
             "/urls",
-            data=json.dumps({
-                "user_id": uid,
-                "original_url": f"https://bench.com/{i}",
-                "title": f"Bench {i}",
-            }),
+            data=json.dumps(
+                {
+                    "user_id": uid,
+                    "original_url": f"https://bench.com/{i}",
+                    "title": f"Bench {i}",
+                }
+            ),
             content_type="application/json",
         )
 
@@ -247,44 +264,59 @@ def main():
         status_counts[code] = status_counts.get(code, 0) + 1
     wall_elapsed = time.perf_counter() - wall_start
     latencies.sort()
-    results.append({
-        "name": "create_url",
-        "method": "POST",
-        "path": "/urls",
-        "iterations": ITERATIONS,
-        "wall_time_s": round(wall_elapsed, 4),
-        "throughput_rps": round(ITERATIONS / wall_elapsed, 2),
-        "latency_ms": {
-            "avg": round(statistics.mean(latencies), 3),
-            "p50": round(percentile(latencies, 50), 3),
-            "p95": round(percentile(latencies, 95), 3),
-            "p99": round(percentile(latencies, 99), 3),
-            "min": round(min(latencies), 3),
-            "max": round(max(latencies), 3),
-            "stdev": round(statistics.stdev(latencies), 3) if len(latencies) > 1 else 0,
-        },
-        "status_codes": status_counts,
-    })
+    results.append(
+        {
+            "name": "create_url",
+            "method": "POST",
+            "path": "/urls",
+            "iterations": ITERATIONS,
+            "wall_time_s": round(wall_elapsed, 4),
+            "throughput_rps": round(ITERATIONS / wall_elapsed, 2),
+            "latency_ms": {
+                "avg": round(statistics.mean(latencies), 3),
+                "p50": round(percentile(latencies, 50), 3),
+                "p95": round(percentile(latencies, 95), 3),
+                "p99": round(percentile(latencies, 99), 3),
+                "min": round(min(latencies), 3),
+                "max": round(max(latencies), 3),
+                "stdev": round(statistics.stdev(latencies), 3)
+                if len(latencies) > 1
+                else 0,
+            },
+            "status_codes": status_counts,
+        }
+    )
 
     # 10. PUT /urls/:id (update)
-    results.append(run_benchmark(
-        client, "update_url", "put", f"/urls/{target_url}",
-        data=json.dumps({"title": "Updated Title"}),
-        content_type="application/json",
-    ))
+    results.append(
+        run_benchmark(
+            client,
+            "update_url",
+            "put",
+            f"/urls/{target_url}",
+            data=json.dumps({"title": "Updated Title"}),
+            content_type="application/json",
+        )
+    )
 
     # 11. GET /events (list)
     results.append(run_benchmark(client, "list_events", "get", "/events"))
 
     # 12. PUT /users/:id (update)
-    results.append(run_benchmark(
-        client, "update_user", "put", f"/users/{target_user}",
-        data=json.dumps({"username": "updated_bench_u0"}),
-        content_type="application/json",
-    ))
+    results.append(
+        run_benchmark(
+            client,
+            "update_user",
+            "put",
+            f"/users/{target_user}",
+            data=json.dumps({"username": "updated_bench_u0"}),
+            content_type="application/json",
+        )
+    )
 
     # 13. Bulk import
     import io
+
     csv_rows = "id,username,email,created_at\n"
     base_id = 90000
     for i in range(100):
@@ -303,27 +335,33 @@ def main():
         ms = (time.perf_counter() - start) * 1000
         bulk_latencies.append(ms)
     bulk_latencies.sort()
-    results.append({
-        "name": "bulk_import_100rows",
-        "method": "POST",
-        "path": "/users/bulk",
-        "iterations": 20,
-        "wall_time_s": round(sum(bulk_latencies) / 1000, 4),
-        "throughput_rps": round(20 / (sum(bulk_latencies) / 1000), 2),
-        "latency_ms": {
-            "avg": round(statistics.mean(bulk_latencies), 3),
-            "p50": round(percentile(bulk_latencies, 50), 3),
-            "p95": round(percentile(bulk_latencies, 95), 3),
-            "p99": round(percentile(bulk_latencies, 99), 3),
-            "min": round(min(bulk_latencies), 3),
-            "max": round(max(bulk_latencies), 3),
-            "stdev": round(statistics.stdev(bulk_latencies), 3) if len(bulk_latencies) > 1 else 0,
-        },
-        "status_codes": {200: 20},
-    })
+    results.append(
+        {
+            "name": "bulk_import_100rows",
+            "method": "POST",
+            "path": "/users/bulk",
+            "iterations": 20,
+            "wall_time_s": round(sum(bulk_latencies) / 1000, 4),
+            "throughput_rps": round(20 / (sum(bulk_latencies) / 1000), 2),
+            "latency_ms": {
+                "avg": round(statistics.mean(bulk_latencies), 3),
+                "p50": round(percentile(bulk_latencies, 50), 3),
+                "p95": round(percentile(bulk_latencies, 95), 3),
+                "p99": round(percentile(bulk_latencies, 99), 3),
+                "min": round(min(bulk_latencies), 3),
+                "max": round(max(bulk_latencies), 3),
+                "stdev": round(statistics.stdev(bulk_latencies), 3)
+                if len(bulk_latencies) > 1
+                else 0,
+            },
+            "status_codes": {200: 20},
+        }
+    )
 
     # Print report
-    print(f"{'Endpoint':<28} {'Method':<7} {'Avg ms':>8} {'p50 ms':>8} {'p95 ms':>8} {'p99 ms':>8} {'Min ms':>8} {'Max ms':>8} {'RPS':>10}")
+    print(
+        f"{'Endpoint':<28} {'Method':<7} {'Avg ms':>8} {'p50 ms':>8} {'p95 ms':>8} {'p99 ms':>8} {'Min ms':>8} {'Max ms':>8} {'RPS':>10}"
+    )
     print("-" * 110)
     for r in results:
         lat = r["latency_ms"]

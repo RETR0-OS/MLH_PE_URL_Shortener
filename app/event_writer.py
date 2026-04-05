@@ -1,4 +1,5 @@
 """Fire-and-forget event writer using a background thread pool."""
+
 import datetime
 import logging
 from concurrent.futures import ThreadPoolExecutor

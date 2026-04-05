@@ -60,17 +60,22 @@ def create_app():
     warm_up()
 
     from app.auth import register_api_key_auth
+
     register_api_key_auth(app)
 
     from app.tracing import init_tracing
+
     init_tracing(app)
 
     # --- Swagger UI at /docs ---
     try:
         from flask_swagger_ui import get_swaggerui_blueprint
+
         SWAGGER_URL = "/docs"
         API_URL = "/apispec.json"
-        swagger_bp = get_swaggerui_blueprint(SWAGGER_URL, API_URL, config={"app_name": "MLH URL Shortener"})
+        swagger_bp = get_swaggerui_blueprint(
+            SWAGGER_URL, API_URL, config={"app_name": "MLH URL Shortener"}
+        )
         app.register_blueprint(swagger_bp, url_prefix=SWAGGER_URL)
     except ImportError:
         logger.info("flask-swagger-ui not installed – Swagger docs disabled")

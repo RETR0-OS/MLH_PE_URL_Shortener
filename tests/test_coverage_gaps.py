@@ -1,4 +1,5 @@
 """Tests targeting every uncovered line for 100% coverage."""
+
 import json
 from unittest.mock import MagicMock, patch
 
@@ -183,9 +184,7 @@ class TestUrlStructuralErrors:
             ),
             content_type="application/json",
         ).get_json()["id"]
-        resp = client.put(
-            f"/urls/{url_id}", data="not json", content_type="text/plain"
-        )
+        resp = client.put(f"/urls/{url_id}", data="not json", content_type="text/plain")
         assert resp.status_code == 400
 
     def test_update_url_bad_is_active_type(self, client):
@@ -215,9 +214,7 @@ class TestUrlStructuralErrors:
             content_type="application/json",
         ).get_json()
         existing_code = first["short_code"]
-        with patch(
-            "app.routes.urls.generate_short_code", return_value=existing_code
-        ):
+        with patch("app.routes.urls.generate_short_code", return_value=existing_code):
             resp = client.post(
                 "/urls",
                 data=json.dumps(
@@ -294,9 +291,7 @@ class TestValidationMissingBranches:
     def test_create_url_empty_original_url(self):
         from app.utils.validation import validate_url_create
 
-        errs = validate_url_create(
-            {"user_id": 1, "original_url": "   ", "title": "T"}
-        )
+        errs = validate_url_create({"user_id": 1, "original_url": "   ", "title": "T"})
         assert "original_url" in errs
 
     def test_create_url_non_string_title(self):

@@ -3,6 +3,7 @@
 When API_KEY is set (non-empty), every request must include a matching
 X-API-Key header.  Health-check endpoints are always exempt.
 """
+
 import os
 import logging
 
@@ -10,7 +11,9 @@ from flask import jsonify, request
 
 logger = logging.getLogger(__name__)
 
-EXEMPT_PATHS = frozenset({"/health", "/health/ready", "/nginx-status", "/docs", "/docs/", "/apispec.json"})
+EXEMPT_PATHS = frozenset(
+    {"/health", "/health/ready", "/nginx-status", "/docs", "/docs/", "/apispec.json"}
+)
 
 
 def register_api_key_auth(app):

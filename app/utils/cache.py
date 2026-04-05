@@ -1,4 +1,5 @@
 """Redis cache-aside with circuit-breaker fallback to DB."""
+
 import json
 import logging
 import time

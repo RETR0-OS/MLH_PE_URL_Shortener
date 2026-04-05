@@ -1,4 +1,5 @@
 """Integration tests for /events endpoint."""
+
 import json
 import time
 
@@ -97,7 +98,14 @@ class TestResponseFormat:
         )
         time.sleep(0.5)
         evt = client.get("/events").get_json()[0]
-        expected_keys = {"id", "url_id", "user_id", "event_type", "timestamp", "details"}
+        expected_keys = {
+            "id",
+            "url_id",
+            "user_id",
+            "event_type",
+            "timestamp",
+            "details",
+        }
         assert set(evt.keys()) == expected_keys
         assert isinstance(evt["details"], dict)
 

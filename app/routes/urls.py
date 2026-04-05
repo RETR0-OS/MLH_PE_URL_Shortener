@@ -74,10 +74,15 @@ def create_url():
             if attempt == 2:
                 return jsonify(error="Failed to generate unique short code"), 500
 
-    log_event(url.id, data["user_id"], "created", {
-        "short_code": short_code,
-        "original_url": data["original_url"],
-    })
+    log_event(
+        url.id,
+        data["user_id"],
+        "created",
+        {
+            "short_code": short_code,
+            "original_url": data["original_url"],
+        },
+    )
     checkpoint("event_queued")
 
     resp = jsonify(url.to_dict())
@@ -131,9 +136,12 @@ def update_url(url_id):
 
     cache_delete(f"url:{url_id}")
 
-    log_event(url.id, url.user_id, "updated", {
-        k: data[k] for k in ("title", "is_active") if k in data
-    })
+    log_event(
+        url.id,
+        url.user_id,
+        "updated",
+        {k: data[k] for k in ("title", "is_active") if k in data},
+    )
 
     return jsonify(url.to_dict())
 

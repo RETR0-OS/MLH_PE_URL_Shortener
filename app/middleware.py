@@ -1,4 +1,5 @@
 """Request middleware: X-Request-ID propagation, structured logging, and checkpoint timing."""
+
 import logging
 import time
 import uuid

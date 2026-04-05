@@ -84,11 +84,7 @@ def bulk_load_users():
     if rows:
         for i in range(0, len(rows), 100):
             with db.atomic():
-                (
-                    User.insert_many(rows[i : i + 100])
-                    .on_conflict_ignore()
-                    .execute()
-                )
+                (User.insert_many(rows[i : i + 100]).on_conflict_ignore().execute())
         _reset_pk_sequence()
 
     return jsonify(count=count, imported=count)
@@ -123,6 +119,7 @@ def delete_user(user_id):
         user.delete_instance()
 
     return "", 204
+
 
 @users_bp.route("/users/<int:user_id>", methods=["PUT"])
 def update_user(user_id):
