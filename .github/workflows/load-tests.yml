@@ -80,14 +80,139 @@ jobs:
       - name: Load test (500 VUs)
         run: k6 run --env BASE_URL=http://localhost:80 --summary-export=k6-summary.json loadtests/stress.js 2>&1 | tee k6-output.txt
 
+      - name: Verify monitoring stack
+        id: monitoring
+        if: always()
+        run: |
+          echo "=== Observability Stack Smoke Tests ==="
+          RESULTS_FILE=$(mktemp)
+          PASS=0; FAIL=0
+
+          check() {
+            local name="$1"; local result="$2"
+            if [ "$result" = "true" ]; then
+              echo "  PASS: $name"; PASS=$((PASS+1))
+              echo "pass|$name" >> "$RESULTS_FILE"
+            else
+              echo "  FAIL: $name"; FAIL=$((FAIL+1))
+              echo "fail|$name" >> "$RESULTS_FILE"
+            fi
+          }
+
+          json_check() {
+            python3 -c "$1" 2>/dev/null || echo "$2"
+          }
+
+          # 1. Prometheus scraped app metrics
+          echo ""
+          echo "--- Prometheus ---"
+          PROM_TARGETS=$(curl -sf http://localhost:9090/api/v1/targets 2>/dev/null || echo "{}")
+          APP_UP=$(echo "$PROM_TARGETS" | json_check "
+          import sys,json
+          data=json.load(sys.stdin)
+          targets=data.get('data',{}).get('activeTargets',[])
+          print('true' if any(t.get('health')=='up' and 'app' in t.get('labels',{}).get('job','') for t in targets) else 'false')" "false")
+          check "Prometheus scraping app target" "$APP_UP"
+
+          FLASK_METRICS=$(curl -sf "http://localhost:9090/api/v1/query?query=flask_http_request_total" 2>/dev/null || echo "{}")
+          HAS_FLASK=$(echo "$FLASK_METRICS" | json_check "
+          import sys,json
+          data=json.load(sys.stdin)
+          print('true' if len(data.get('data',{}).get('result',[])) > 0 else 'false')" "false")
+          check "Flask HTTP metrics in Prometheus" "$HAS_FLASK"
+
+          # 2. Loki receiving logs via Promtail
+          echo ""
+          echo "--- Loki / Promtail ---"
+          LOKI_READY=$(curl -sf http://localhost:3100/ready 2>/dev/null | grep -c "ready" || echo "0")
+          check "Loki is ready" "$([ "$LOKI_READY" -ge 1 ] && echo true || echo false)"
+
+          LOKI_LOGS=$(curl -sf "http://localhost:3100/loki/api/v1/query?query=%7Bjob%3D%22app%22%7D&limit=5" 2>/dev/null || echo "{}")
+          HAS_LOGS=$(echo "$LOKI_LOGS" | json_check "
+          import sys,json
+          data=json.load(sys.stdin)
+          streams=data.get('data',{}).get('result',[])
+          print('true' if len(streams) > 0 else 'false')" "false")
+          check "App logs flowing to Loki" "$HAS_LOGS"
+
+          # 3. Grafana accessible with dashboards
+          echo ""
+          echo "--- Grafana ---"
+          GF_AUTH="admin:admin"
+          GF_HEALTH=$(curl -sf http://localhost:3000/api/health 2>/dev/null || echo "{}")
+          GF_OK=$(echo "$GF_HEALTH" | json_check "
+          import sys,json
+          data=json.load(sys.stdin)
+          print('true' if data.get('database')=='ok' else 'false')" "false")
+          check "Grafana is healthy" "$GF_OK"
+
+          GF_DS=$(curl -sf -u "$GF_AUTH" http://localhost:3000/api/datasources 2>/dev/null || echo "[]")
+          DS_COUNT=$(echo "$GF_DS" | json_check "import sys,json; print(len(json.load(sys.stdin)))" "0")
+          check "Grafana datasources configured ($DS_COUNT)" "$([ "$DS_COUNT" -ge 1 ] && echo true || echo false)"
+
+          GF_DASH=$(curl -sf -u "$GF_AUTH" "http://localhost:3000/api/search?type=dash-db" 2>/dev/null || echo "[]")
+          DASH_COUNT=$(echo "$GF_DASH" | json_check "import sys,json; print(len(json.load(sys.stdin)))" "0")
+          check "Grafana dashboards loaded ($DASH_COUNT)" "$([ "$DASH_COUNT" -ge 1 ] && echo true || echo false)"
+
+          # 4. Alertmanager running and reachable
+          echo ""
+          echo "--- Alertmanager ---"
+          AM_STATUS=$(curl -sf http://localhost:9093/api/v2/status 2>/dev/null || echo "{}")
+          AM_READY=$(echo "$AM_STATUS" | json_check "
+          import sys,json
+          data=json.load(sys.stdin)
+          print('true' if data.get('cluster',{}).get('status')=='ready' else 'false')" "false")
+          check "Alertmanager cluster is ready" "$AM_READY"
+
+          AM_RECEIVERS=$(curl -sf http://localhost:9093/api/v2/receivers 2>/dev/null || echo "[]")
+          RECV_NAMES=$(echo "$AM_RECEIVERS" | json_check "
+          import sys,json
+          data=json.load(sys.stdin)
+          print(','.join(r.get('name','') for r in data))" "")
+          check "Alertmanager receivers: $RECV_NAMES" "$([ -n "$RECV_NAMES" ] && echo true || echo false)"
+
+          # 5. Prometheus alert rules loaded
+          echo ""
+          echo "--- Alert Rules ---"
+          RULES=$(curl -sf http://localhost:9090/api/v1/rules 2>/dev/null || echo "{}")
+          RULE_COUNT=$(echo "$RULES" | json_check "
+          import sys,json
+          data=json.load(sys.stdin)
+          groups=data.get('data',{}).get('groups',[])
+          rules=[r for g in groups for r in g.get('rules',[])]
+          print(len(rules))" "0")
+          check "Prometheus alert rules loaded ($RULE_COUNT)" "$([ "$RULE_COUNT" -ge 1 ] && echo true || echo false)"
+
+          echo ""
+          echo "=== Results: $PASS passed, $FAIL failed ==="
+
+          {
+            echo "monitoring_pass=$PASS"
+            echo "monitoring_fail=$FAIL"
+            echo "monitoring_results<<MONITORING_EOF"
+            cat "$RESULTS_FILE"
+            echo "MONITORING_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          rm -f "$RESULTS_FILE"
+
+          if [ "$FAIL" -gt 0 ]; then
+            echo "::warning::$FAIL monitoring checks failed"
+          fi
+
       - name: Post load test results to PR
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
+        env:
+          MONITORING_PASS: ${{ steps.monitoring.outputs.monitoring_pass }}
+          MONITORING_FAIL: ${{ steps.monitoring.outputs.monitoring_fail }}
+          MONITORING_RESULTS: ${{ steps.monitoring.outputs.monitoring_results }}
         with:
           script: |
             const fs = require('fs');
 
-            let summary = '';
+            // --- k6 load test section ---
+            let loadSection = '';
             try {
               const raw = fs.readFileSync('k6-summary.json', 'utf8');
               const data = JSON.parse(raw);
@@ -99,7 +224,7 @@ jobs:
               const fails = m.http_req_failed || {};
               const iters = m.iterations || {};
 
-              summary = [
+              loadSection = [
                 '## Load Test Results',
                 '',
                 '| Metric | Value |',
@@ -122,7 +247,7 @@ jobs:
                 '</details>',
               ].join('\n');
             } catch (e) {
-              summary = [
+              loadSection = [
                 '## Load Test Results',
                 '',
                 '> Failed to parse k6 summary JSON.',
@@ -135,6 +260,41 @@ jobs:
                 '</details>',
               ].join('\n');
             }
+
+            // --- Monitoring stack section ---
+            const monPass = parseInt(process.env.MONITORING_PASS || '0');
+            const monFail = parseInt(process.env.MONITORING_FAIL || '0');
+            const monTotal = monPass + monFail;
+            const monResults = (process.env.MONITORING_RESULTS || '').trim();
+
+            let monSection = '';
+            if (monTotal > 0) {
+              const icon = monFail === 0 ? '✅' : '⚠️';
+              const headline = monFail === 0
+                ? `${icon} All ${monTotal} checks passed`
+                : `${icon} ${monPass}/${monTotal} checks passed (${monFail} failed)`;
+
+              const rows = monResults.split('\n').filter(Boolean).map(line => {
+                const [status, name] = line.split('|', 2);
+                const emoji = status === 'pass' ? '✅' : '❌';
+                return `| ${emoji} | ${name} |`;
+              });
+
+              monSection = [
+                '',
+                '---',
+                '',
+                '## Observability Stack Verification',
+                '',
+                headline,
+                '',
+                '| Status | Check |',
+                '|--------|-------|',
+                ...rows,
+              ].join('\n');
+            }
+
+            const summary = loadSection + monSection;
 
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
