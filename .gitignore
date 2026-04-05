@@ -43,4 +43,4 @@ nginx/certs/
 # Coverage
 coverage.xml
 htmlcov/
-results
+resultsSUBMISSION_*.md
