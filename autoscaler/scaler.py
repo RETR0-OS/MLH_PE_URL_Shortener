@@ -11,6 +11,7 @@ Scale-down: triggered when avg CPU <= SCALE_DOWN_THRESHOLD for SCALE_DOWN_WINDOW
 
 Separate cooldown timers for scale-up and scale-down prevent flapping.
 """
+
 import os
 import time
 import logging
@@ -25,21 +26,31 @@ logging.basicConfig(
 log = logging.getLogger("autoscaler")
 
 # ── Configuration (all overridable via environment variables) ─────────────────
-SERVICE_NAME          = os.environ.get("SERVICE_NAME", "app")
-MIN_REPLICAS          = int(os.environ.get("MIN_REPLICAS", "2"))
-MAX_REPLICAS          = int(os.environ.get("MAX_REPLICAS", "5"))
-SCALE_UP_THRESHOLD    = float(os.environ.get("SCALE_UP_THRESHOLD", "70.0"))   # % of CPU limit
-SCALE_DOWN_THRESHOLD  = float(os.environ.get("SCALE_DOWN_THRESHOLD", "30.0")) # % of CPU limit
-CPU_LIMIT_CORES       = float(os.environ.get("CPU_LIMIT_CORES", "0.75"))       # must match compose cpus
-POLL_INTERVAL         = int(os.environ.get("POLL_INTERVAL", "10"))             # seconds
+SERVICE_NAME = os.environ.get("SERVICE_NAME", "app")
+MIN_REPLICAS = int(os.environ.get("MIN_REPLICAS", "2"))
+MAX_REPLICAS = int(os.environ.get("MAX_REPLICAS", "5"))
+SCALE_UP_THRESHOLD = float(
+    os.environ.get("SCALE_UP_THRESHOLD", "70.0")
+)  # % of CPU limit
+SCALE_DOWN_THRESHOLD = float(
+    os.environ.get("SCALE_DOWN_THRESHOLD", "30.0")
+)  # % of CPU limit
+CPU_LIMIT_CORES = float(
+    os.environ.get("CPU_LIMIT_CORES", "0.75")
+)  # must match compose cpus
+POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "10"))  # seconds
 
 # Consecutive polls above/below threshold before acting
-SCALE_UP_WINDOW       = int(os.environ.get("SCALE_UP_WINDOW", "2"))   # 2 × 10s = 20 s sustained
-SCALE_DOWN_WINDOW     = int(os.environ.get("SCALE_DOWN_WINDOW", "6")) # 6 × 10s = 60 s sustained
+SCALE_UP_WINDOW = int(
+    os.environ.get("SCALE_UP_WINDOW", "2")
+)  # 2 × 10s = 20 s sustained
+SCALE_DOWN_WINDOW = int(
+    os.environ.get("SCALE_DOWN_WINDOW", "6")
+)  # 6 × 10s = 60 s sustained
 
 # Minimum seconds between successive scale events (per direction)
-SCALE_UP_COOLDOWN     = int(os.environ.get("SCALE_UP_COOLDOWN", "60"))
-SCALE_DOWN_COOLDOWN   = int(os.environ.get("SCALE_DOWN_COOLDOWN", "120"))
+SCALE_UP_COOLDOWN = int(os.environ.get("SCALE_UP_COOLDOWN", "60"))
+SCALE_DOWN_COOLDOWN = int(os.environ.get("SCALE_DOWN_COOLDOWN", "120"))
 
 # ── Docker client ─────────────────────────────────────────────────────────────
 client = docker.from_env()
@@ -218,8 +229,12 @@ def main() -> None:
     log.info(
         "Autoscaler starting — service=%s  min=%d  max=%d  "
         "scale_up≥%.0f%%  scale_down≤%.0f%%  poll=%ds",
-        SERVICE_NAME, MIN_REPLICAS, MAX_REPLICAS,
-        SCALE_UP_THRESHOLD, SCALE_DOWN_THRESHOLD, POLL_INTERVAL,
+        SERVICE_NAME,
+        MIN_REPLICAS,
+        MAX_REPLICAS,
+        SCALE_UP_THRESHOLD,
+        SCALE_DOWN_THRESHOLD,
+        POLL_INTERVAL,
     )
 
     # Detect project name from running containers (retried until found)
@@ -227,20 +242,22 @@ def main() -> None:
     while not project:
         project = detect_project_name()
         if not project:
-            log.warning("Could not detect project name yet, retrying in %ds…", POLL_INTERVAL)
+            log.warning(
+                "Could not detect project name yet, retrying in %ds…", POLL_INTERVAL
+            )
             time.sleep(POLL_INTERVAL)
 
     log.info("Detected Compose project: %s", project)
 
-    scale_up_streak    = 0
-    scale_down_streak  = 0
-    last_scale_up_at   = 0.0
+    scale_up_streak = 0
+    scale_down_streak = 0
+    last_scale_up_at = 0.0
     last_scale_down_at = 0.0
 
     while True:
         try:
             containers = get_app_containers(project)
-            current    = len(containers)
+            current = len(containers)
 
             if current == 0:
                 log.warning("No running %s containers found, waiting…", SERVICE_NAME)
@@ -248,52 +265,71 @@ def main() -> None:
                 continue
 
             avg_cpu = average_cpu(containers)
-            now     = time.monotonic()
+            now = time.monotonic()
 
             log.info(
                 "replicas=%-2d  avg_cpu=%5.1f%%  streak_up=%d/%d  streak_down=%d/%d",
-                current, avg_cpu,
-                scale_up_streak, SCALE_UP_WINDOW,
-                scale_down_streak, SCALE_DOWN_WINDOW,
+                current,
+                avg_cpu,
+                scale_up_streak,
+                SCALE_UP_WINDOW,
+                scale_down_streak,
+                SCALE_DOWN_WINDOW,
             )
 
             # ── Scale-up path ─────────────────────────────────────────────────
             if avg_cpu >= SCALE_UP_THRESHOLD:
-                scale_up_streak  += 1
+                scale_up_streak += 1
                 scale_down_streak = 0
 
                 if scale_up_streak >= SCALE_UP_WINDOW:
                     if current >= MAX_REPLICAS:
-                        log.info("Already at max replicas (%d), cannot scale up", MAX_REPLICAS)
+                        log.info(
+                            "Already at max replicas (%d), cannot scale up",
+                            MAX_REPLICAS,
+                        )
                     elif (now - last_scale_up_at) < SCALE_UP_COOLDOWN:
                         remaining = SCALE_UP_COOLDOWN - (now - last_scale_up_at)
                         log.info("Scale-up cooldown: %.0fs remaining", remaining)
                     else:
-                        log.info("SCALE UP  %d → %d  (avg_cpu=%.1f%%)", current, current + 1, avg_cpu)
+                        log.info(
+                            "SCALE UP  %d → %d  (avg_cpu=%.1f%%)",
+                            current,
+                            current + 1,
+                            avg_cpu,
+                        )
                         scale_up(containers, project)
-                        scale_up_streak  = 0
+                        scale_up_streak = 0
                         last_scale_up_at = now
 
             # ── Scale-down path ───────────────────────────────────────────────
             elif avg_cpu <= SCALE_DOWN_THRESHOLD:
                 scale_down_streak += 1
-                scale_up_streak    = 0
+                scale_up_streak = 0
 
                 if scale_down_streak >= SCALE_DOWN_WINDOW:
                     if current <= MIN_REPLICAS:
-                        log.info("Already at min replicas (%d), cannot scale down", MIN_REPLICAS)
+                        log.info(
+                            "Already at min replicas (%d), cannot scale down",
+                            MIN_REPLICAS,
+                        )
                     elif (now - last_scale_down_at) < SCALE_DOWN_COOLDOWN:
                         remaining = SCALE_DOWN_COOLDOWN - (now - last_scale_down_at)
                         log.info("Scale-down cooldown: %.0fs remaining", remaining)
                     else:
-                        log.info("SCALE DOWN %d → %d  (avg_cpu=%.1f%%)", current, current - 1, avg_cpu)
+                        log.info(
+                            "SCALE DOWN %d → %d  (avg_cpu=%.1f%%)",
+                            current,
+                            current - 1,
+                            avg_cpu,
+                        )
                         scale_down(containers, project)
-                        scale_down_streak  = 0
+                        scale_down_streak = 0
                         last_scale_down_at = now
 
             # ── Neutral band ──────────────────────────────────────────────────
             else:
-                scale_up_streak   = 0
+                scale_up_streak = 0
                 scale_down_streak = 0
 
         except DockerException as exc:

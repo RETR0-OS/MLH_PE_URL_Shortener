@@ -1,3 +1,9 @@
+---
+layout: default
+title: Design Decisions — Incident Response
+permalink: /incident-response/design-decisions
+---
+
 # Track 3: Incident Response — Design Decisions & Evidence Map
 
 **Project:** MLH Production Engineering URL Shortener
@@ -55,43 +61,43 @@ All screenshots are located in `docs/Incident Response/screenshots/` and demonst
 
 Shows the live `/metrics` endpoint returning Prometheus metrics (`flask_http_request_total`, `flask_http_request_duration_seconds_bucket`, `process_resident_memory_bytes`, etc.)
 
-![Metrics Endpoint](screenshots/metrics-endpoint.png)
+![Metrics Endpoint]({{ site.baseurl }}/Incident%20Response/screenshots/metrics-endpoint.png)
 
 ### 2. Prometheus Alert Rules — [Decision S1](#decision-s1-prometheus--alertmanager-over-grafana-alerting)
 
 All 7 alert rules loaded in Prometheus (ServiceDown, HighErrorRate, HighLatency, RedisDown, HighReplicaCount, HighRequestRate, HighMemoryUsage) with their expressions and `for` durations.
 
-![Prometheus Alert Rules](screenshots/prometheus-alert-rules.png)
+![Prometheus Alert Rules]({{ site.baseurl }}/Incident%20Response/screenshots/prometheus-alert-rules.png)
 
 ### 3. Alertmanager UI — [Decision S2](#decision-s2-email-via-resend-smtp-as-primary-notification-channel)
 
 Alertmanager is running and processing alerts with severity-based routing.
 
-![Alertmanager UI](screenshots/alertmanager-ui.png)
+![Alertmanager UI]({{ site.baseurl }}/Incident%20Response/screenshots/alertmanager-ui.png)
 
 ### 4. Alertmanager Configuration — [Decision S4](#decision-s4-alert-timing-tuned-for-sub-5-minute-delivery)
 
 Full Alertmanager configuration showing email receivers (Resend SMTP), `group_wait: 0s` for critical, `group_wait: 10s` for warnings.
 
-![Alertmanager Config](screenshots/alertmanager-config.png)
+![Alertmanager Config]({{ site.baseurl }}/Incident%20Response/screenshots/alertmanager-config.png)
 
 ### 5. Grafana Golden Signals Dashboard — [Decision G1](#decision-g1-single-golden-signals-dashboard-with-8-panels)
 
 Grafana "Golden Signals" dashboard with all 8 panels showing live data from k6 load testing (50 VUs, ~237 req/s): Uptime, Active Alerts, Request Rate, Error Rate, Latency p50/p95/p99, Memory RSS, CPU %, Application Logs.
 
-![Grafana Golden Signals Dashboard](screenshots/grafana-golden-signals-dashboard.png)
+![Grafana Golden Signals Dashboard]({{ site.baseurl }}/Incident%20Response/screenshots/grafana-golden-signals-dashboard.png)
 
 ### 6. Grafana Loki Logs — [Decision B5](#decision-b5-loki--promtail-for-ssh-free-log-inspection)
 
 Centralized log viewing via Grafana + Loki without SSH — structured JSON logs queryable with `{job="app"}`.
 
-![Grafana Loki Logs](screenshots/grafana-loki-logs.png)
+![Grafana Loki Logs]({{ site.baseurl }}/Incident%20Response/screenshots/grafana-loki-logs.png)
 
 ### 7. Jaeger Distributed Tracing — [Architecture Overview](#architecture-overview)
 
 Distributed tracing via Jaeger + OpenTelemetry showing request traces across services.
 
-![Jaeger Tracing](screenshots/jaeger-tracing.png)
+![Jaeger Tracing]({{ site.baseurl }}/Incident%20Response/screenshots/jaeger-tracing.png)
 
 ---
 
@@ -150,7 +156,7 @@ Distributed tracing via Jaeger + OpenTelemetry showing request traces across ser
 
 > **Visual evidence:**
 >
-> ![Metrics Endpoint](screenshots/metrics-endpoint.png)
+> ![Metrics Endpoint]({{ site.baseurl }}/Incident%20Response/screenshots/metrics-endpoint.png)
 
 ### Decision B5: Loki + Promtail for SSH-free log inspection
 
@@ -174,7 +180,7 @@ Distributed tracing via Jaeger + OpenTelemetry showing request traces across ser
 
 > **Visual evidence:**
 >
-> ![Grafana Loki Logs](screenshots/grafana-loki-logs.png)
+> ![Grafana Loki Logs]({{ site.baseurl }}/Incident%20Response/screenshots/grafana-loki-logs.png)
 
 ---
 
@@ -196,7 +202,7 @@ Distributed tracing via Jaeger + OpenTelemetry showing request traces across ser
 
 > **Visual evidence:**
 >
-> ![Prometheus Alert Rules](screenshots/prometheus-alert-rules.png)
+> ![Prometheus Alert Rules]({{ site.baseurl }}/Incident%20Response/screenshots/prometheus-alert-rules.png)
 
 ### Decision S2: Email (via Resend SMTP) as primary notification channel
 
@@ -220,9 +226,9 @@ Distributed tracing via Jaeger + OpenTelemetry showing request traces across ser
 
 > **Visual evidence:**
 >
-> ![Alertmanager UI](screenshots/alertmanager-ui.png)
+> ![Alertmanager UI]({{ site.baseurl }}/Incident%20Response/screenshots/alertmanager-ui.png)
 >
-> ![Alertmanager Config](screenshots/alertmanager-config.png)
+> ![Alertmanager Config]({{ site.baseurl }}/Incident%20Response/screenshots/alertmanager-config.png)
 
 ### Decision S3: Discord as opt-in secondary channel
 
@@ -294,7 +300,7 @@ Distributed tracing via Jaeger + OpenTelemetry showing request traces across ser
 
 > **Visual evidence:**
 >
-> ![Grafana Golden Signals Dashboard](screenshots/grafana-golden-signals-dashboard.png)
+> ![Grafana Golden Signals Dashboard]({{ site.baseurl }}/Incident%20Response/screenshots/grafana-golden-signals-dashboard.png)
 
 ### Decision G2: Grafana auto-provisioning via file-based providers
 
@@ -389,7 +395,7 @@ Distributed tracing via Jaeger + OpenTelemetry showing request traces across ser
 
 > **Visual evidence:**
 >
-> ![Jaeger Tracing](screenshots/jaeger-tracing.png)
+> ![Jaeger Tracing]({{ site.baseurl }}/Incident%20Response/screenshots/jaeger-tracing.png)
 
 ---
 

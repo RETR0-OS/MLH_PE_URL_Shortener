@@ -107,6 +107,18 @@ class TestValidateUrlCreate:
         errs = validate_url_create({"user_id": 1, "title": "T"})
         assert "original_url" in errs
 
+    def test_invalid_url_single_slash(self):
+        errs = validate_url_create(
+            {"user_id": 1, "original_url": "https:/github.com", "title": "T"}
+        )
+        assert "original_url" in errs
+
+    def test_invalid_url_no_scheme(self):
+        errs = validate_url_create(
+            {"user_id": 1, "original_url": "github.com", "title": "T"}
+        )
+        assert "original_url" in errs
+
     def test_missing_title(self):
         errs = validate_url_create({"user_id": 1, "original_url": "https://x.com"})
         assert "title" in errs

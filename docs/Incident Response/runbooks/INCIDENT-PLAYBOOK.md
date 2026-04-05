@@ -1,3 +1,9 @@
+---
+layout: default
+title: Incident Response Playbook
+permalink: /incident-response/playbook
+---
+
 # URL Shortener — Incident Response Playbook
 
 **In Case of Emergency, open this document.**
