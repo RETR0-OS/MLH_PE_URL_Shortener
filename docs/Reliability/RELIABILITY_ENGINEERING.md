@@ -6,7 +6,7 @@ permalink: /Reliability/RELIABILITY_ENGINEERING
 
 # Reliability Engineering
 
-We built a URL shortener that doesn't just pass tests — it survives production conditions. The service runs as 2 replicated containers behind Nginx, enforces 70%+ test coverage on every PR, self-heals from container crashes and Redis failures without human intervention, and has a full observability stack (Prometheus, Grafana, Loki, Alertmanager) that fires alerts within 90 seconds of a failure. 174 tests across unit, integration, performance, and coverage-gap categories run in CI before any merge is allowed.
+We built a URL shortener that doesn't just pass tests — it survives production conditions. The service runs as 2 replicated containers behind Nginx, enforces 70%+ test coverage on every PR, self-heals from container crashes and Redis failures without human intervention, and has a full observability stack (Prometheus, Grafana, Loki, Alertmanager) that fires alerts within 90 seconds of a failure. 177 tests across unit, integration, performance, and coverage-gap categories run in CI before any merge is allowed.
 
 ---
 
@@ -45,7 +45,7 @@ The [`unit-tests.yml`](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/blob/dev
 
 ![PR #12 — github-actions bot: coverage report 91% and test results overview](screenshots/pr12-overview-coverage-report-91pct.png)
 
-![PR #12 — Unit Test Results: 174/174 passed, 91% coverage, 18.09s](screenshots/pr12-unit-tests-174-passed-91pct-load-test-start.png)
+![PR #12 — Unit Test Results: 177/177 passed, 91% coverage, 18.09s](screenshots/pr12-unit-tests-174-passed-91pct-load-test-start.png)
 
 > [PR #12 on GitHub](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/pull/12) · [Unit Tests workflow](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/actions/workflows/unit-tests.yml)
 
@@ -281,7 +281,7 @@ At no point are zero replicas running. Nginx routes traffic to whichever replica
 ### Strengths of this architecture
 
 - **Reliability without complexity** — 2 replicas, restart policies, circuit breakers, and chaos tests give us production-grade resilience from a single `docker-compose.yml` with no Kubernetes overhead
-- **CI as the staging environment** — every PR runs 174 tests, 500-VU load tests, and lint checks against real service containers; code is battle-tested before it ever touches the server
+- **CI as the staging environment** — every PR runs 177 tests, 500-VU load tests, and lint checks against real service containers; code is battle-tested before it ever touches the server
 - **Zero-downtime by default** — `start-first` rolling deploys + Nginx health routing mean users never see a deploy in progress
 - **Full observability stack** — Prometheus metrics, Grafana dashboards, Loki logs, Jaeger traces, and Alertmanager notifications give us complete visibility without any third-party SaaS
 - **Graceful degradation** — Redis goes down and the app keeps serving from Postgres with zero errors; a replica dies and Nginx routes around it; bad input returns clean JSON instead of stack traces
