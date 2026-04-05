@@ -22,7 +22,8 @@ if [ -n "$DISCORD_WEBHOOK_URL" ]; then
     - receiver: "discord-warnings"\
       continue: true' "$CONFIG"
 
-  # Append discord receivers from the overlay file
+  # Append discord receivers under the existing receivers: block
+  echo "" >> "$CONFIG"
   cat "$DISCORD_TEMPLATE" >> "$CONFIG"
   sed -i "s|\${DISCORD_WEBHOOK_URL}|${DISCORD_WEBHOOK_URL}|g" "$CONFIG"
 fi
