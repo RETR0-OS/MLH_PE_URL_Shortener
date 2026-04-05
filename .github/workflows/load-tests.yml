@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, dev]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   load-test:
     runs-on: ubuntu-latest
@@ -74,7 +78,95 @@ jobs:
           sudo apt-get install -y k6
 
       - name: Load test (500 VUs)
-        run: k6 run --env SCENARIO=tier3 --env BASE_URL=http://localhost:80 loadtests/k6_test.js
+        run: k6 run --env SCENARIO=tier3 --env BASE_URL=http://localhost:80 --summary-export=k6-summary.json loadtests/k6_test.js 2>&1 | tee k6-output.txt
+
+      - name: Post load test results to PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let summary = '';
+            try {
+              const raw = fs.readFileSync('k6-summary.json', 'utf8');
+              const data = JSON.parse(raw);
+              const m = data.metrics;
+
+              const fmt = (v) => v !== undefined ? v.toFixed(2) : 'N/A';
+              const dur = m.http_req_duration || {};
+              const reqs = m.http_reqs || {};
+              const fails = m.http_req_failed || {};
+              const iters = m.iterations || {};
+
+              summary = [
+                '## Load Test Results',
+                '',
+                '| Metric | Value |',
+                '|--------|-------|',
+                `| **Total Requests** | ${fmt(reqs.count)} |`,
+                `| **Request Rate** | ${fmt(reqs.rate)} req/s |`,
+                `| **Avg Response Time** | ${fmt(dur.avg)} ms |`,
+                `| **p50 Response Time** | ${fmt(dur.med)} ms |`,
+                `| **p90 Response Time** | ${fmt(dur['p(90)'])} ms |`,
+                `| **p95 Response Time** | ${fmt(dur['p(95)'])} ms |`,
+                `| **Max Response Time** | ${fmt(dur.max)} ms |`,
+                `| **Error Rate** | ${fmt((fails.rate || 0) * 100)}% |`,
+                `| **Total Iterations** | ${fmt(iters.count)} |`,
+                '',
+                '<details><summary>Full k6 output</summary>',
+                '',
+                '```',
+                fs.readFileSync('k6-output.txt', 'utf8').slice(-3000),
+                '```',
+                '</details>',
+              ].join('\n');
+            } catch (e) {
+              summary = [
+                '## Load Test Results',
+                '',
+                '> Failed to parse k6 summary JSON.',
+                '',
+                '<details><summary>Full k6 output</summary>',
+                '',
+                '```',
+                fs.existsSync('k6-output.txt') ? fs.readFileSync('k6-output.txt', 'utf8').slice(-3000) : 'No output captured.',
+                '```',
+                '</details>',
+              ].join('\n');
+            }
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body.includes('## Load Test Results'));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: summary,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: summary,
+              });
+            }
+
+      - name: Upload k6 results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results
+          path: |
+            k6-summary.json
+            k6-output.txt
 
       - name: Collect logs on failure
         if: failure()

@@ -1,0 +1,83 @@
+name: Unit Tests
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: hackathon_db_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 3
+
+    env:
+      DATABASE_NAME: hackathon_db_test
+      DATABASE_HOST: localhost
+      DATABASE_PORT: "5432"
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      REDIS_HOST: localhost
+      REDIS_PORT: "6379"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with: { enable-cache: true }
+
+      - run: uv sync
+
+      - name: Run tests with coverage
+        run: uv run pytest --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=70 -v --junitxml=test-results.xml
+
+      - name: Test Report
+        if: always() && github.event_name == 'pull_request'
+        uses: dorny/test-reporter@v1
+        with:
+          name: Test Results
+          path: test-results.xml
+          reporter: java-junit
+
+      - name: Coverage comment
+        if: always() && github.event_name == 'pull_request'
+        uses: MishaKav/pytest-coverage-comment@main
+        with:
+          pytest-xml-coverage-path: coverage.xml
+          junitxml-path: test-results.xml
+          title: "Coverage Report"
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.xml
+            test-results.xml
