@@ -1,7 +1,7 @@
 global:
   resolve_timeout: 5m
   smtp_smarthost: "smtp.resend.com:587"
-  smtp_from: "onboarding@resend.dev"
+  smtp_from: "alerts@hackathon.forgeopus.org"
   smtp_auth_username: "resend"
   smtp_auth_password: "${RESEND_API_KEY}"
   smtp_require_tls: true

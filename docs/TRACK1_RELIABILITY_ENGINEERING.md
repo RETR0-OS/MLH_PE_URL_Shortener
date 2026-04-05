@@ -1,3 +1,9 @@
+---
+layout: default
+title: Reliability Quest
+permalink: /TRACK1_RELIABILITY_ENGINEERING
+---
+
 # 🛡️ Quest: Reliability Engineering
 
 **Build a service that refuses to die easily.**

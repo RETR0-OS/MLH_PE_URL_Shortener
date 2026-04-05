@@ -33,8 +33,8 @@ Alert configuration and notification delivery.
 
 **Alert Timing:**
 - ServiceDown: fires in ~70 seconds (1m detection + 0s group_wait)
-- HighErrorRate: fires in ~130 seconds (2m detection + 10s group_wait)
-- HighLatency: fires in ~130 seconds (2m detection + 10s group_wait)
+- HighErrorRate: fires in ~45 seconds (30s detection + 10s group_wait)
+- HighLatency: fires in ~45 seconds (30s detection + 10s group_wait)
 - RedisDown: fires in ~70 seconds (1m detection + 10s group_wait)
 
 All within the 5-minute requirement.
@@ -58,16 +58,16 @@ Dashboard visualization, runbooks, and RCA capability.
 
 ## Files Created (6 new)
 
-All files placed in dedicated `incident-response/` folder:
+All files placed in dedicated `docs/Incident Response/` folder:
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `incident-response/README.md` | Index for judges | 160 |
-| `incident-response/chaos/chaos-test.sh` | Automated failure injection + alert verification | 600+ |
-| `incident-response/rca/RCA-001-redis-failure.md` | Root Cause Analysis narrative | 350+ |
-| `incident-response/rca/POSTMORTEM-TEMPLATE.md` | Reusable postmortem template | 200+ |
-| `incident-response/runbooks/INCIDENT-PLAYBOOK.md` | Master incident response playbook | 650+ |
-| `incident-response/screenshots/.gitkeep` | Placeholder for submission screenshots | — |
+| `docs/Incident Response/README.md` | Index for judges | 160 |
+| `scripts/chaos-test.sh` | Automated failure injection + alert verification | 600+ |
+| `docs/Incident Response/rca/RCA-001-redis-failure.md` | Root Cause Analysis narrative | 350+ |
+| `docs/Incident Response/rca/POSTMORTEM-TEMPLATE.md` | Reusable postmortem template | 200+ |
+| `docs/Incident Response/runbooks/INCIDENT-PLAYBOOK.md` | Master incident response playbook | 650+ |
+| `docs/Incident Response/screenshots/.gitkeep` | Placeholder for submission screenshots | — |
 
 ## Files Modified (4 existing)
 
@@ -121,7 +121,7 @@ Comprehensive review identified 33 issues across 7 files:
 
 ### Silver Tier Verification
 - ✅ ServiceDown alert (fires when `up == 0` for 1m)
-- ✅ HighErrorRate alert (fires when 5xx rate > 10% for 2m)
+- ✅ HighErrorRate alert (fires when 5xx rate > 5% for 30s)
 - ✅ Email notifications via SMTP (requires credentials in `.env`)
 - ✅ Alert fires within 5 minutes (~70-130s depending on alert)
 - ✅ Chaos testing script (`chaos-test.sh`) for live demo
@@ -129,17 +129,17 @@ Comprehensive review identified 33 issues across 7 files:
 **Usage:**
 ```bash
 # Dry run
-./incident-response/chaos/chaos-test.sh --service-down --dry-run
+./scripts/chaos-test.sh --service-down --dry-run
 
 # Live demo
-./incident-response/chaos/chaos-test.sh --service-down
-./incident-response/chaos/chaos-test.sh --all
+./scripts/chaos-test.sh --service-down
+./scripts/chaos-test.sh --all
 ```
 
 ### Gold Tier Verification
 - ✅ Grafana dashboard with 8 panels (4+ metrics covering golden signals)
 - ✅ Per-alert runbooks (in `docs/RUNBOOK.md`)
-- ✅ Master incident playbook (in `incident-response/runbooks/INCIDENT-PLAYBOOK.md`)
+- ✅ Master incident playbook (in `docs/Incident Response/runbooks/INCIDENT-PLAYBOOK.md`)
 - ✅ RCA narrative referencing specific Grafana panels and PromQL queries
 - ✅ Postmortem template for future incidents
 
@@ -179,8 +179,8 @@ Comprehensive review identified 33 issues across 7 files:
 | Alert | Severity | Condition | Duration | Expected Fire Time |
 |-------|----------|-----------|----------|-------------------|
 | ServiceDown | Critical | `up == 0` | 1m | ~70s |
-| HighErrorRate | Warning | 5xx rate > 10% | 2m | ~130s |
-| HighLatency | Warning | p95 > 3s | 2m | ~130s |
+| HighErrorRate | Warning | 5xx rate > 5% | 30s | ~45s |
+| HighLatency | Warning | p95 > 500ms | 30s | ~45s |
 | RedisDown | Warning | Redis errors increasing | 1m | ~70s |
 
 ### Routing (alertmanager.yml)
@@ -243,11 +243,11 @@ Redis container crashed due to OOMKill (out of memory). Circuit breaker in `app/
 ### Incident Response
 | Document | Location | Purpose |
 |----------|----------|---------|
-| README | `incident-response/README.md` | Index for judges |
-| Chaos script | `incident-response/chaos/chaos-test.sh` | Automated failure injection |
-| RCA | `incident-response/rca/RCA-001-redis-failure.md` | Formal incident narrative |
-| Postmortem template | `incident-response/rca/POSTMORTEM-TEMPLATE.md` | Reusable template |
-| Playbook | `incident-response/runbooks/INCIDENT-PLAYBOOK.md` | Master operational guide |
+| README | `docs/Incident Response/README.md` | Index for judges |
+| Chaos script | `scripts/chaos-test.sh` | Automated failure injection |
+| RCA | `docs/Incident Response/rca/RCA-001-redis-failure.md` | Formal incident narrative |
+| Postmortem template | `docs/Incident Response/rca/POSTMORTEM-TEMPLATE.md` | Reusable template |
+| Playbook | `docs/Incident Response/runbooks/INCIDENT-PLAYBOOK.md` | Master operational guide |
 
 ### Related Docs
 | Document | Location | Purpose |
@@ -290,7 +290,7 @@ Redis container crashed due to OOMKill (out of memory). Circuit breaker in `app/
 ### Live Demo Script
 ```bash
 # Test service-down scenario (app will be stopped)
-./incident-response/chaos/chaos-test.sh --service-down
+./scripts/chaos-test.sh --service-down
 
 # Expected:
 # 1. App container stops
@@ -379,8 +379,8 @@ Redis container crashed due to OOMKill (out of memory). Circuit breaker in `app/
 
 1. **Configure SMTP:** Add real email credentials to `.env`
 2. **Start stack:** `docker compose up -d --build`
-3. **Run demo:** `./incident-response/chaos/chaos-test.sh --service-down`
-4. **Submit:** Commit all changes and link submission to `incident-response/README.md`
+3. **Run demo:** `./scripts/chaos-test.sh --service-down`
+4. **Submit:** Commit all changes and link submission to `docs/Incident Response/README.md`
 
 ---
 

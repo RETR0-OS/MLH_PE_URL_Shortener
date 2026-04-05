@@ -57,7 +57,7 @@ services:
       postgres:
         condition: service_healthy
     restart: "no"
-
+  
   postgres:
     image: postgres:16-alpine
     environment:
@@ -71,6 +71,9 @@ services:
       -c effective_cache_size=384MB
       -c maintenance_work_mem=64MB
       -c max_connections=100
+      -c wal_buffers=16MB
+      -c checkpoint_completion_target=0.9
+      -c synchronous_commit=off
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
@@ -195,7 +198,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 512M
 
   alertmanager:
     image: prom/alertmanager:latest
@@ -208,7 +211,7 @@ services:
       - "9093:9093"
     environment:
       RESEND_API_KEY: "${RESEND_API_KEY:-}"
-      ALERT_EMAIL_TO: "${ALERT_EMAIL_TO:-teamasdaa@gmail.com}"
+      ALERT_EMAIL_TO: "${ALERT_EMAIL_TO:-contact.sahajpreetsingh@gmail.com}"
       DISCORD_WEBHOOK_URL: "${DISCORD_WEBHOOK_URL:-}"
     restart: unless-stopped
     deploy:

@@ -33,9 +33,15 @@ def list_urls():
     query = query.limit(per_page)
 
     checkpoint("query_build")
-    result = [u.to_dict() for u in query]
+    rows = list(query.dicts())
+    for r in rows:
+        r["user_id"] = r.pop("user", None)
+        if r.get("created_at"):
+            r["created_at"] = r["created_at"].isoformat()
+        if r.get("updated_at"):
+            r["updated_at"] = r["updated_at"].isoformat()
     checkpoint("db_query_and_serialize")
-    return jsonify(result)
+    return jsonify(rows)
 
 
 @urls_bp.route("/urls", methods=["POST"])
@@ -125,16 +131,20 @@ def update_url(url_id):
 
     try:
         with db.atomic():
+            dirty = [Url.updated_at]
             if "title" in data:
                 url.title = data["title"]
+                dirty.append(Url.title)
             if "is_active" in data:
                 url.is_active = data["is_active"]
+                dirty.append(Url.is_active)
             url.updated_at = utcnow()
-            url.save()
+            url.save(only=dirty)
     except IntegrityError as exc:
         return jsonify({"error": str(exc)}), 422
 
     cache_delete(f"url:{url_id}")
+    cache_delete(f"redir:{url.short_code}")
 
     log_event(
         url.id,
@@ -148,10 +158,27 @@ def update_url(url_id):
 
 @urls_bp.route("/urls/<short_code>/redirect", methods=["GET"])
 def redirect_short_code(short_code):
+    cached = cache_get(f"redir:{short_code}")
+    if cached is not None:
+        if not cached["is_active"]:
+            return jsonify(error="URL is deactivated"), 410
+        log_event(
+            cached["id"], cached["user_id"], "redirect", {"short_code": short_code}
+        )
+        return redirect(cached["original_url"], code=302)
+
     try:
         url = Url.get(Url.short_code == short_code)
     except Url.DoesNotExist:
         return jsonify(error="Not found"), 404
+
+    redir_data = {
+        "id": url.id,
+        "user_id": url.user_id,
+        "original_url": url.original_url,
+        "is_active": url.is_active,
+    }
+    cache_set(f"redir:{short_code}", redir_data, ttl=300)
 
     if not url.is_active:
         return jsonify(error="URL is deactivated"), 410
@@ -174,4 +201,5 @@ def delete_url(url_id):
         url.delete_instance()
 
     cache_delete(f"url:{url_id}")
+    cache_delete(f"redir:{url.short_code}")
     return "", 204

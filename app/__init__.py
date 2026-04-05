@@ -1,4 +1,5 @@
 import logging
+import os
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, send_from_directory
@@ -79,6 +80,13 @@ def create_app():
         app.register_blueprint(swagger_bp, url_prefix=SWAGGER_URL)
     except ImportError:
         logger.info("flask-swagger-ui not installed – Swagger docs disabled")
+
+    @app.route("/")
+    @metrics.do_not_track()
+    def dashboard():
+        return send_from_directory(
+            os.path.join(app.static_folder, "dashboard"), "index.html"
+        )
 
     @app.route("/apispec.json")
     @metrics.do_not_track()

@@ -9,19 +9,36 @@
     {"url": "/", "description": "Default"},
     {"url": "/v1", "description": "API v1"}
   ],
+  "security": [{"ApiKeyAuth": []}],
   "paths": {
     "/health": {
       "get": {
         "tags": ["Health"],
         "summary": "Liveness probe",
-        "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object", "properties": {"status": {"type": "string"}}}}}}}
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {"application/json": {"schema": {"type": "object", "properties": {"status": {"type": "string", "example": "ok"}}}}}
+          }
+        }
       }
     },
     "/health/ready": {
       "get": {
         "tags": ["Health"],
-        "summary": "Readiness probe (checks DB)",
-        "responses": {"200": {"description": "OK"}, "503": {"description": "Unavailable"}}
+        "summary": "Readiness probe — checks DB connectivity",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Ready",
+            "content": {"application/json": {"schema": {"type": "object", "properties": {"status": {"type": "string", "example": "ok"}}}}}
+          },
+          "503": {
+            "description": "Database unavailable",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}
+          }
+        }
       }
     },
     "/users": {
@@ -29,25 +46,61 @@
         "tags": ["Users"],
         "summary": "List users",
         "parameters": [
-          {"name": "page", "in": "query", "schema": {"type": "integer", "default": 1}},
-          {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 20}},
-          {"name": "cursor", "in": "query", "schema": {"type": "integer"}, "description": "ID of the last item from the previous page (cursor-based pagination)"}
+          {"name": "page", "in": "query", "schema": {"type": "integer", "default": 1}, "description": "Page number (offset-based pagination, ignored when cursor is set)"},
+          {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 20}, "description": "Number of results per page"},
+          {"name": "cursor", "in": "query", "schema": {"type": "integer"}, "description": "ID of the last item from the previous page (cursor-based pagination; takes priority over page)"}
         ],
-        "responses": {"200": {"description": "OK"}}
+        "responses": {
+          "200": {
+            "description": "List of users",
+            "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/User"}}}}
+          }
+        }
       },
       "post": {
         "tags": ["Users"],
         "summary": "Create a user",
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "required": ["username", "email"], "properties": {"username": {"type": "string"}, "email": {"type": "string", "format": "email"}}}}}},
-        "responses": {"201": {"description": "Created"}, "400": {"description": "Bad request"}, "409": {"description": "Conflict (duplicate)"}, "422": {"description": "Validation error"}}
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UserCreate"}}}
+        },
+        "responses": {
+          "201": {
+            "description": "User created",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}}
+          },
+          "400": {"description": "Bad request — missing or malformed body", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "409": {"description": "Conflict — username or email already exists", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "422": {"description": "Validation error — field-level details", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ValidationError"}}}}
+        }
       }
     },
     "/users/bulk": {
       "post": {
         "tags": ["Users"],
-        "summary": "Bulk load users from CSV",
-        "requestBody": {"required": true, "content": {"multipart/form-data": {"schema": {"type": "object", "properties": {"file": {"type": "string", "format": "binary"}}}}}},
-        "responses": {"200": {"description": "OK"}}
+        "summary": "Bulk import users from a CSV file",
+        "description": "CSV must have columns: id, username, email, created_at (format: YYYY-MM-DD HH:MM:SS). Existing rows are skipped on conflict.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {"type": "string", "format": "binary", "description": "CSV file with columns: id, username, email, created_at"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import complete",
+            "content": {"application/json": {"schema": {"type": "object", "properties": {"count": {"type": "integer"}, "imported": {"type": "integer"}}}}}
+          },
+          "400": {"description": "No file provided", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
       }
     },
     "/users/{id}": {
@@ -55,67 +108,147 @@
         "tags": ["Users"],
         "summary": "Get user by ID",
         "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}],
-        "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}}
+        "responses": {
+          "200": {
+            "description": "User found",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}}
+          },
+          "404": {"description": "User not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
       },
       "put": {
         "tags": ["Users"],
         "summary": "Update user",
         "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}],
-        "requestBody": {"content": {"application/json": {"schema": {"type": "object", "properties": {"username": {"type": "string"}, "email": {"type": "string"}}}}}},
-        "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}}
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {"type": "string"},
+                  "email": {"type": "string", "format": "email"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User updated",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}}
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "User not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "422": {"description": "Conflict — duplicate username or email", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
       },
       "delete": {
         "tags": ["Users"],
-        "summary": "Delete user and cascade-nullify related data",
+        "summary": "Delete user — cascades to their URLs and events",
         "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}],
-        "responses": {"204": {"description": "Deleted"}, "404": {"description": "Not found"}}
+        "responses": {
+          "204": {"description": "Deleted"},
+          "404": {"description": "User not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
       }
     },
     "/urls": {
       "get": {
         "tags": ["URLs"],
-        "summary": "List URLs",
+        "summary": "List short URLs",
         "parameters": [
-          {"name": "user_id", "in": "query", "schema": {"type": "integer"}},
-          {"name": "is_active", "in": "query", "schema": {"type": "string", "enum": ["true","false"]}},
-          {"name": "cursor", "in": "query", "schema": {"type": "integer"}}
+          {"name": "user_id", "in": "query", "schema": {"type": "integer"}, "description": "Filter by owner user ID"},
+          {"name": "is_active", "in": "query", "schema": {"type": "string", "enum": ["true", "false"]}, "description": "Filter by active status"},
+          {"name": "cursor", "in": "query", "schema": {"type": "integer"}, "description": "ID of the last item from the previous page (cursor-based pagination)"},
+          {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 100}, "description": "Number of results per page"}
         ],
-        "responses": {"200": {"description": "OK"}}
+        "responses": {
+          "200": {
+            "description": "List of URLs",
+            "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/ShortUrl"}}}}
+          }
+        }
       },
       "post": {
         "tags": ["URLs"],
         "summary": "Create a short URL",
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "required": ["user_id","original_url","title"], "properties": {"user_id": {"type": "integer"}, "original_url": {"type": "string", "format": "uri"}, "title": {"type": "string"}}}}}},
-        "responses": {"201": {"description": "Created"}, "400": {"description": "Bad request"}}
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UrlCreate"}}}
+        },
+        "responses": {
+          "201": {
+            "description": "Short URL created",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ShortUrl"}}}
+          },
+          "400": {"description": "Bad request — missing fields or unknown user", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "422": {"description": "Validation error — field-level details", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ValidationError"}}}},
+          "500": {"description": "Internal error — failed to generate a unique short code after 3 attempts", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
       }
     },
     "/urls/{id}": {
       "get": {
         "tags": ["URLs"],
-        "summary": "Get URL by ID",
+        "summary": "Get short URL by ID",
         "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}],
-        "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}}
+        "responses": {
+          "200": {
+            "description": "URL found",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ShortUrl"}}}
+          },
+          "404": {"description": "URL not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
       },
       "put": {
         "tags": ["URLs"],
-        "summary": "Update URL",
+        "summary": "Update short URL",
         "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}],
-        "requestBody": {"content": {"application/json": {"schema": {"type": "object", "properties": {"title": {"type": "string"}, "is_active": {"type": "boolean"}}}}}},
-        "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}}
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {"type": "string"},
+                  "is_active": {"type": "boolean"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "URL updated",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ShortUrl"}}}
+          },
+          "400": {"description": "Bad request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "URL not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "422": {"description": "Constraint violation", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
       },
       "delete": {
         "tags": ["URLs"],
-        "summary": "Delete URL",
+        "summary": "Delete short URL — nullifies related events",
         "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}],
-        "responses": {"204": {"description": "Deleted"}, "404": {"description": "Not found"}}
+        "responses": {
+          "204": {"description": "Deleted"},
+          "404": {"description": "URL not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
       }
     },
     "/urls/{short_code}/redirect": {
       "get": {
         "tags": ["URLs"],
-        "summary": "Redirect via short code",
+        "summary": "Redirect to original URL via short code",
+        "security": [],
         "parameters": [{"name": "short_code", "in": "path", "required": true, "schema": {"type": "string"}}],
-        "responses": {"302": {"description": "Redirect"}, "404": {"description": "Not found"}, "410": {"description": "Gone (deactivated)"}}
+        "responses": {
+          "302": {"description": "Redirecting to original URL"},
+          "404": {"description": "Short code not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "410": {"description": "URL has been deactivated", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
       }
     },
     "/events": {
@@ -123,18 +256,34 @@
         "tags": ["Events"],
         "summary": "List events",
         "parameters": [
-          {"name": "url_id", "in": "query", "schema": {"type": "integer"}},
-          {"name": "user_id", "in": "query", "schema": {"type": "integer"}},
-          {"name": "event_type", "in": "query", "schema": {"type": "string"}},
-          {"name": "cursor", "in": "query", "schema": {"type": "integer"}}
+          {"name": "url_id", "in": "query", "schema": {"type": "integer"}, "description": "Filter by URL ID"},
+          {"name": "user_id", "in": "query", "schema": {"type": "integer"}, "description": "Filter by user ID"},
+          {"name": "event_type", "in": "query", "schema": {"type": "string"}, "description": "Filter by event type (e.g. created, redirect, updated)"},
+          {"name": "cursor", "in": "query", "schema": {"type": "integer"}, "description": "ID of the last item from the previous page (cursor-based pagination)"},
+          {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 100}, "description": "Number of results per page"}
         ],
-        "responses": {"200": {"description": "OK"}}
+        "responses": {
+          "200": {
+            "description": "List of events",
+            "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/Event"}}}}
+          }
+        }
       },
       "post": {
         "tags": ["Events"],
         "summary": "Create an event",
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "required": ["url_id","user_id","event_type"], "properties": {"url_id": {"type": "integer"}, "user_id": {"type": "integer"}, "event_type": {"type": "string"}, "details": {"type": "object"}}}}}},
-        "responses": {"201": {"description": "Created"}, "400": {"description": "Bad request"}}
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EventCreate"}}}
+        },
+        "responses": {
+          "201": {
+            "description": "Event created",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Event"}}}
+          },
+          "400": {"description": "Bad request — missing/invalid fields", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "Referenced URL or user not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
       }
     },
     "/events/{id}": {
@@ -142,14 +291,41 @@
         "tags": ["Events"],
         "summary": "Get event by ID",
         "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}],
-        "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}}
+        "responses": {
+          "200": {
+            "description": "Event found",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Event"}}}
+          },
+          "404": {"description": "Event not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
       },
       "put": {
         "tags": ["Events"],
         "summary": "Update event",
         "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}],
-        "requestBody": {"content": {"application/json": {"schema": {"type": "object", "properties": {"event_type": {"type": "string"}, "details": {"type": "object"}, "url_id": {"type": "integer"}, "user_id": {"type": "integer"}}}}}},
-        "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}}
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "event_type": {"type": "string"},
+                  "details": {"type": "object"},
+                  "url_id": {"type": "integer"},
+                  "user_id": {"type": "integer"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Event updated",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Event"}}}
+          },
+          "400": {"description": "Bad request — missing body or invalid field types", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "404": {"description": "Event, URL, or user not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
       }
     }
   },
@@ -158,7 +334,85 @@
       "ApiKeyAuth": {
         "type": "apiKey",
         "in": "header",
-        "name": "X-API-Key"
+        "name": "X-API-Key",
+        "description": "Optional. Set API_KEY env var on the server to enable enforcement. Pass the key in the X-API-Key header."
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {"type": "string"}
+        },
+        "example": {"error": "Not found"}
+      },
+      "ValidationError": {
+        "type": "object",
+        "properties": {
+          "error": {"type": "string"},
+          "details": {"type": "object", "additionalProperties": {"type": "string"}}
+        },
+        "example": {"error": "Validation failed", "details": {"email": "Invalid email format"}}
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "username": {"type": "string"},
+          "email": {"type": "string", "format": "email"},
+          "created_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "UserCreate": {
+        "type": "object",
+        "required": ["username", "email"],
+        "properties": {
+          "username": {"type": "string"},
+          "email": {"type": "string", "format": "email"}
+        }
+      },
+      "ShortUrl": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "user_id": {"type": "integer"},
+          "short_code": {"type": "string"},
+          "original_url": {"type": "string", "format": "uri"},
+          "title": {"type": "string"},
+          "is_active": {"type": "boolean"},
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "UrlCreate": {
+        "type": "object",
+        "required": ["user_id", "original_url", "title"],
+        "properties": {
+          "user_id": {"type": "integer"},
+          "original_url": {"type": "string", "format": "uri"},
+          "title": {"type": "string"}
+        }
+      },
+      "Event": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "url_id": {"type": "integer", "nullable": true},
+          "user_id": {"type": "integer", "nullable": true},
+          "event_type": {"type": "string"},
+          "timestamp": {"type": "string", "format": "date-time"},
+          "details": {"type": "object"}
+        }
+      },
+      "EventCreate": {
+        "type": "object",
+        "required": ["url_id", "user_id", "event_type"],
+        "properties": {
+          "url_id": {"type": "integer"},
+          "user_id": {"type": "integer"},
+          "event_type": {"type": "string"},
+          "details": {"type": "object", "default": {}}
+        }
       }
     }
   }
