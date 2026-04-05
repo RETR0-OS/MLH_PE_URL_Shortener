@@ -1,3 +1,9 @@
+---
+layout: default
+title: Reliability Engineering
+permalink: /Reliability/RELIABILITY_ENGINEERING
+---
+
 # Reliability Engineering
 
 We built a URL shortener that doesn't just pass tests — it survives production conditions. The service runs as 2 replicated containers behind Nginx, enforces 70%+ test coverage on every PR, self-heals from container crashes and Redis failures without human intervention, and has a full observability stack (Prometheus, Grafana, Loki, Alertmanager) that fires alerts within 90 seconds of a failure. 174 tests across unit, integration, performance, and coverage-gap categories run in CI before any merge is allowed.

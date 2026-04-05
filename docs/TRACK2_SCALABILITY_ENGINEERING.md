@@ -1,3 +1,9 @@
+---
+layout: default
+title: Scalability Engineering
+permalink: /TRACK2_SCALABILITY_ENGINEERING
+---
+
 # 🚀 Quest: Scalability Engineering
 
 **Make it handle the entire internet.**

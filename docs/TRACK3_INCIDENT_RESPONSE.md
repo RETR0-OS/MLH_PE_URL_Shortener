@@ -1,3 +1,9 @@
+---
+layout: default
+title: Incident Response
+permalink: /TRACK3_INCIDENT_RESPONSE
+---
+
 # 🚨 Quest: Incident Response
 
 **Be the one who knows when it breaks.**

@@ -1,3 +1,9 @@
+---
+layout: default
+title: Documentation
+permalink: /TRACK4_DOCUMENTATION
+---
+
 # 📜 Bonus Quest: Documentation
 
 **The difference between a script and a product.**
