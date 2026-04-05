@@ -2,7 +2,7 @@ import ipaddress
 import re
 from urllib.parse import urlparse
 
-from email_validator import EmailNotValidError, validate_email
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 _LABEL_RE = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$")
 
@@ -35,11 +35,9 @@ def _is_private_ip(host: str) -> bool:
 
 def _validate_email(raw: str) -> str | None:
     """Return an error string or None if valid."""
-    try:
-        validate_email(raw, check_deliverability=False)
-        return None
-    except EmailNotValidError as exc:
-        return str(exc)
+    if len(raw) > 254 or not _EMAIL_RE.match(raw):
+        return "Email must be a valid email address"
+    return None
 
 
 def _validate_original_url(url: str) -> str | None:
