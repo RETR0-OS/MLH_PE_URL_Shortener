@@ -1,3 +1,9 @@
+---
+layout: default
+title: Postmortem Template
+permalink: /incident-response/postmortem-template
+---
+
 # Incident Postmortem Template
 
 > This template follows the [Google SRE](https://sre.google/sre-book/postmortem-culture/) incident postmortem model. Use it after every production incident (severity P1–P3). Aim to complete within 5 business days of resolution.

@@ -160,7 +160,7 @@ title: Home
     <div class="card-desc">500 VU k6 load tests, Nginx load balancing, Redis caching, horizontal scaling, and bottleneck analysis.</div>
     <div class="card-arrow">Read docs →</div>
   </a>
-  <a class="card" href="{{ site.baseurl }}/TRACK3_INCIDENT_RESPONSE">
+  <a class="card" href="{{ site.baseurl }}/incident-response/">
     <div class="card-icon">🚨</div>
     <div class="card-title">Incident Response</div>
     <div class="card-desc">Prometheus alerting, Grafana dashboards, Loki log aggregation, Jaeger tracing, and RCA documentation.</div>
@@ -191,6 +191,18 @@ title: Home
   <a class="ref-item" href="{{ site.baseurl }}/TRACK2_SCALABILITY_ENGINEERING#bottleneck-analysis">
     <div class="ref-name">Bottleneck Report</div>
     <div class="ref-desc">What was slow and how we fixed it</div>
+  </a>
+  <a class="ref-item" href="{{ site.baseurl }}/incident-response/design-decisions">
+    <div class="ref-name">IR Design Decisions</div>
+    <div class="ref-desc">Monitoring and alerting design rationale</div>
+  </a>
+  <a class="ref-item" href="{{ site.baseurl }}/incident-response/playbook">
+    <div class="ref-name">Incident Playbook</div>
+    <div class="ref-desc">On-call runbook for production incidents</div>
+  </a>
+  <a class="ref-item" href="{{ site.baseurl }}/incident-response/rca/redis-failure">
+    <div class="ref-name">RCA: Redis Failure</div>
+    <div class="ref-desc">Root cause analysis with circuit breaker</div>
   </a>
   <a class="ref-item" href="http://64.225.10.147/docs/" target="_blank">
     <div class="ref-name">API Docs</div>

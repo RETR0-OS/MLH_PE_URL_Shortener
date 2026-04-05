@@ -1,3 +1,9 @@
+---
+layout: default
+title: Incident Response — Track 3
+permalink: /incident-response/
+---
+
 # Incident Response — Track 3 Deliverables
 
 Complete incident response infrastructure for the URL Shortener service. This folder contains all Track 3 deliverables organized by tier.
@@ -83,9 +89,9 @@ curl -s http://localhost:5000/metrics    # Prometheus metrics
 | Requirement | Implementation | Location |
 |-------------|---------------|----------|
 | Grafana dashboard (4+ metrics) | 8 panels: Uptime, Alerts, Request Rate, Error Rate, Latency, Memory, CPU, Logs | [`monitoring/grafana/dashboards/url-shortener.json`](../../monitoring/grafana/dashboards/url-shortener.json) |
-| Runbook | Per-alert mitigation + master incident playbook | [`INCIDENT-PLAYBOOK.md`](runbooks/INCIDENT-PLAYBOOK.md) |
-| RCA exercise | Redis failure diagnosis using dashboard + logs | [`RCA-001-redis-failure.md`](rca/RCA-001-redis-failure.md) |
-| Postmortem template | Google SRE format with 5 Whys | [`POSTMORTEM-TEMPLATE.md`](rca/POSTMORTEM-TEMPLATE.md) |
+| Runbook | Per-alert mitigation + master incident playbook | [`INCIDENT-PLAYBOOK.md`]({{ site.baseurl }}/incident-response/playbook) |
+| RCA exercise | Redis failure diagnosis using dashboard + logs | [`RCA-001-redis-failure.md`]({{ site.baseurl }}/incident-response/rca/redis-failure) |
+| Postmortem template | Google SRE format with 5 Whys | [`POSTMORTEM-TEMPLATE.md`]({{ site.baseurl }}/incident-response/postmortem-template) |
 
 **Dashboard panels (Golden Signals):**
 
@@ -143,8 +149,8 @@ scripts/
 
 ## Related Documentation
 
-- [Incident Playbook](runbooks/INCIDENT-PLAYBOOK.md) — Per-alert runbooks, SLO targets, remediation commands, escalation paths
-- [RCA: Redis Failure](rca/RCA-001-redis-failure.md) — Root cause analysis using dashboard and logs
-- [Postmortem Template](rca/POSTMORTEM-TEMPLATE.md) — Google SRE-style postmortem format
-- [Track 3 Design Decisions](INCIDENT_RESPONSE_ENGINEERING_DESIGN_DECISIONS.md) — All design decisions with rationale and evidence
-- [Track 3 Requirements](../TRACK3_INCIDENT_RESPONSE.md) — Original quest specification
+- [Incident Playbook]({{ site.baseurl }}/incident-response/playbook) — Per-alert runbooks, SLO targets, remediation commands, escalation paths
+- [RCA: Redis Failure]({{ site.baseurl }}/incident-response/rca/redis-failure) — Root cause analysis using dashboard and logs
+- [Postmortem Template]({{ site.baseurl }}/incident-response/postmortem-template) — Google SRE-style postmortem format
+- [Track 3 Design Decisions]({{ site.baseurl }}/incident-response/design-decisions) — All design decisions with rationale and evidence
+- [Track 3 Requirements]({{ site.baseurl }}/TRACK3_INCIDENT_RESPONSE) — Original quest specification

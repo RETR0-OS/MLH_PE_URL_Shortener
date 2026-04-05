@@ -1,3 +1,9 @@
+---
+layout: default
+title: "RCA-001: Redis Unavailability"
+permalink: /incident-response/rca/redis-failure
+---
+
 # RCA-001: Redis Unavailability — Graceful Degradation via Circuit Breaker
 
 **Incident ID:** RCA-001
