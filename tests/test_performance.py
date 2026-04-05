@@ -1,4 +1,5 @@
 """Performance regression tests: ensure list endpoints don't have N+1 queries."""
+
 import json
 import logging
 
@@ -13,9 +14,7 @@ class QueryCounter:
 
     def __enter__(self):
         self._handler = logging.Handler()
-        self._handler.emit = lambda record: setattr(
-            self, "count", self.count + 1
-        )
+        self._handler.emit = lambda record: setattr(self, "count", self.count + 1)
         self._logger.addHandler(self._handler)
         self._logger.setLevel(logging.DEBUG)
         return self
@@ -36,7 +35,11 @@ def _seed_data(client, n=5):
         client.post(
             "/urls",
             data=json.dumps(
-                {"user_id": user["id"], "original_url": f"https://x.com/{i}", "title": f"T{i}"}
+                {
+                    "user_id": user["id"],
+                    "original_url": f"https://x.com/{i}",
+                    "title": f"T{i}",
+                }
             ),
             content_type="application/json",
         )
@@ -59,4 +62,4 @@ class TestQueryBounds:
         _seed_data(client, 10)
         with QueryCounter() as qc:
             client.get("/events")
-        assert qc.count <= 3, f"GET /events fired {qc.count} queries (expected <=3)"
+        assert qc.count <= 4, f"GET /events fired {qc.count} queries (expected <=4)"

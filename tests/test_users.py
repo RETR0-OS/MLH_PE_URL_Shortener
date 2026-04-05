@@ -1,4 +1,5 @@
 """Integration tests for /users endpoints."""
+
 import io
 import json
 
@@ -129,7 +130,9 @@ class TestBulkLoadUsers:
         assert resp.status_code == 400
 
     def test_imported_users_queryable(self, client):
-        csv_data = "id,username,email,created_at\n10,seeded,seeded@x.com,2025-06-01 12:00:00\n"
+        csv_data = (
+            "id,username,email,created_at\n10,seeded,seeded@x.com,2025-06-01 12:00:00\n"
+        )
         data = {"file": (io.BytesIO(csv_data.encode()), "users.csv")}
         client.post("/users/bulk", data=data, content_type="multipart/form-data")
         resp = client.get("/users/10")

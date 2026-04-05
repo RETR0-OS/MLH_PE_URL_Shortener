@@ -1,23 +1,19 @@
-import datetime
-
 from peewee import AutoField, CharField, DateTimeField, ForeignKeyField
 from playhouse.postgres_ext import BinaryJSONField
 
-from app.database import BaseModel
+from app.database import BaseModel, utcnow
 from app.models.url import Url
 from app.models.user import User
-
-
-def _utcnow():
-    return datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
 
 
 class Event(BaseModel):
     id = AutoField()
     url = ForeignKeyField(Url, backref="events", column_name="url_id", null=True)
-    user = ForeignKeyField(User, backref="user_events", column_name="user_id", null=True)
+    user = ForeignKeyField(
+        User, backref="user_events", column_name="user_id", null=True
+    )
     event_type = CharField(max_length=50)
-    timestamp = DateTimeField(default=_utcnow)
+    timestamp = DateTimeField(default=utcnow)
     details = BinaryJSONField(default=dict)
 
     class Meta:

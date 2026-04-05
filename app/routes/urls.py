@@ -1,9 +1,7 @@
-import datetime
-
 from flask import Blueprint, jsonify, redirect, request
 from peewee import IntegrityError
 
-from app.database import db
+from app.database import db, utcnow
 from app.event_writer import log_event
 from app.middleware import checkpoint
 from app.models.url import Url
@@ -13,10 +11,6 @@ from app.utils.shortcode import generate_short_code
 from app.utils.validation import validate_url_create, validate_url_update
 
 urls_bp = Blueprint("urls", __name__)
-
-
-def _utcnow():
-    return datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
 
 
 @urls_bp.route("/urls", methods=["GET"])
@@ -36,8 +30,7 @@ def list_urls():
         query = query.where(Url.is_active == (is_active.lower() == "true"))
 
     per_page = request.args.get("per_page", 100, type=int)
-    if cursor is not None:
-        query = query.limit(per_page)
+    query = query.limit(per_page)
 
     checkpoint("query_build")
     result = [u.to_dict() for u in query]
@@ -61,7 +54,7 @@ def create_url():
         return jsonify(error=f"User {data['user_id']} not found"), 400
     checkpoint("user_lookup")
 
-    now = _utcnow()
+    now = utcnow()
     for attempt in range(3):
         short_code = generate_short_code()
         try:
@@ -81,10 +74,15 @@ def create_url():
             if attempt == 2:
                 return jsonify(error="Failed to generate unique short code"), 500
 
-    log_event(url.id, data["user_id"], "created", {
-        "short_code": short_code,
-        "original_url": data["original_url"],
-    })
+    log_event(
+        url.id,
+        data["user_id"],
+        "created",
+        {
+            "short_code": short_code,
+            "original_url": data["original_url"],
+        },
+    )
     checkpoint("event_queued")
 
     resp = jsonify(url.to_dict())
@@ -131,16 +129,19 @@ def update_url(url_id):
                 url.title = data["title"]
             if "is_active" in data:
                 url.is_active = data["is_active"]
-            url.updated_at = _utcnow()
+            url.updated_at = utcnow()
             url.save()
     except IntegrityError as exc:
         return jsonify({"error": str(exc)}), 422
 
     cache_delete(f"url:{url_id}")
 
-    log_event(url.id, url.user_id, "updated", {
-        k: data[k] for k in ("title", "is_active") if k in data
-    })
+    log_event(
+        url.id,
+        url.user_id,
+        "updated",
+        {k: data[k] for k in ("title", "is_active") if k in data},
+    )
 
     return jsonify(url.to_dict())
 

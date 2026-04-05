@@ -1,9 +1,10 @@
 """Redis cache-aside with circuit-breaker fallback to DB."""
+
 import json
 import logging
-import os
 import time
-from pathlib import Path
+
+from app.utils.secrets import read_secret
 
 logger = logging.getLogger(__name__)
 
@@ -11,13 +12,6 @@ _redis_client = None
 _circuit_open = False
 _circuit_open_until = 0.0
 CIRCUIT_RESET_SECONDS = 30
-
-
-def _read_secret(name, default=None):
-    secret_path = Path(f"/run/secrets/{name}")
-    if secret_path.exists():
-        return secret_path.read_text().strip()
-    return os.environ.get(name.upper(), default)
 
 
 def get_redis():
@@ -36,9 +30,9 @@ def get_redis():
     try:
         import redis
 
-        host = _read_secret("redis_host", "redis")
-        port = int(_read_secret("redis_port", "6379"))
-        password = _read_secret("redis_password", None) or None
+        host = read_secret("redis_host", "redis")
+        port = int(read_secret("redis_port", "6379"))
+        password = read_secret("redis_password", None) or None
         _redis_client = redis.Redis(
             host=host,
             port=port,
@@ -108,18 +102,20 @@ def cache_delete(key):
 
 
 def cache_delete_pattern(pattern):
-    """Delete keys matching a pattern using SCAN (non-blocking). Fails silently."""
+    """Delete keys matching a pattern using SCAN + pipeline. Fails silently."""
     r = get_redis()
     if r is None:
         return
     try:
         cursor = 0
+        pipe = r.pipeline()
         while True:
             cursor, keys = r.scan(cursor, match=pattern, count=100)
-            if keys:
-                r.delete(*keys)
+            for key in keys:
+                pipe.delete(key)
             if cursor == 0:
                 break
+        pipe.execute()
     except Exception:
         logger.warning("Redis DELETE pattern failed for %s", pattern)
         _open_circuit()

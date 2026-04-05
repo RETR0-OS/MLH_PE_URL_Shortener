@@ -1,4 +1,5 @@
 """Unit tests for utilities: validation, short code generation, serialization."""
+
 import datetime
 
 from app.utils.shortcode import generate_short_code

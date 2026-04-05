@@ -1,8 +1,8 @@
-import multiprocessing
+import os
 
 bind = "0.0.0.0:5000"
-workers = min(4, multiprocessing.cpu_count() * 2 + 1)
-threads = 2
+workers = 2
+threads = 4
 worker_class = "gthread"
 
 timeout = 30
@@ -16,7 +16,43 @@ accesslog = "-"
 errorlog = "-"
 loglevel = "info"
 
-preload_app = False
+logconfig_dict = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": "pythonjsonlogger.json.JsonFormatter",
+            "fmt": "%(asctime)s %(levelname)s %(name)s %(message)s",
+            "rename_fields": {"asctime": "timestamp", "levelname": "level"},
+            "datefmt": "%Y-%m-%dT%H:%M:%S",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+            "stream": "ext://sys.stdout",
+        },
+    },
+    "root": {
+        "level": "INFO",
+        "handlers": ["console"],
+    },
+    "loggers": {
+        "gunicorn.error": {
+            "level": "INFO",
+            "handlers": ["console"],
+            "propagate": False,
+        },
+        "gunicorn.access": {
+            "level": "INFO",
+            "handlers": ["console"],
+            "propagate": False,
+        },
+    },
+}
+
+preload_app = True
 
 forwarded_allow_ips = "*"
 proxy_protocol = False
@@ -39,5 +75,9 @@ def on_exit(server):
 
 
 def post_fork(server, worker):
-    """Called after a worker is forked – good place for per-worker init."""
-    server.log.info("Worker spawned (pid=%s)", worker.pid)
+    """Re-initialize DB pool in child to avoid sharing connections across fork."""
+    server.log.info("Worker spawned (pid=%s), reinitializing DB pool", worker.pid)
+    from app.database import db, _create_database
+    if not db.is_closed():
+        db.close()
+    db.initialize(_create_database())

@@ -3,6 +3,7 @@
 Initialises the OTel SDK and auto-instruments Flask.  If the OTLP
 endpoint is unreachable the app continues without tracing.
 """
+
 import logging
 import os
 
@@ -17,7 +18,9 @@ def init_tracing(app):
 
     try:
         from opentelemetry import trace
-        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+            OTLPSpanExporter,
+        )
         from opentelemetry.instrumentation.flask import FlaskInstrumentor
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
@@ -34,4 +37,6 @@ def init_tracing(app):
         FlaskInstrumentor().instrument_app(app)
         logger.info("OpenTelemetry tracing initialised → %s", endpoint)
     except Exception:
-        logger.warning("Failed to initialise tracing – continuing without it", exc_info=True)
+        logger.warning(
+            "Failed to initialise tracing – continuing without it", exc_info=True
+        )

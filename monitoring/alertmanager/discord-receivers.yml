@@ -1,0 +1,33 @@
+  - name: "discord-critical"
+    discord_configs:
+      - webhook_url: "${DISCORD_WEBHOOK_URL}"
+        send_resolved: true
+        title: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+        message: |
+          {{ range .Alerts }}
+          **Alert:** {{ .Labels.alertname }}
+          **Severity:** {{ .Labels.severity }}
+          **Instance:** {{ .Labels.instance }}
+          **Summary:** {{ .Annotations.summary }}
+          **Description:** {{ .Annotations.description }}
+          **Started:** {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
+          ---
+          {{ end }}
+          [Alertmanager](http://localhost:9093) | [Grafana](http://localhost:3000) | [Prometheus](http://localhost:9090)
+
+  - name: "discord-warnings"
+    discord_configs:
+      - webhook_url: "${DISCORD_WEBHOOK_URL}"
+        send_resolved: true
+        title: '⚠️ WARNING: {{ .GroupLabels.alertname }}'
+        message: |
+          {{ range .Alerts }}
+          **Alert:** {{ .Labels.alertname }}
+          **Severity:** {{ .Labels.severity }}
+          **Instance:** {{ .Labels.instance }}
+          **Summary:** {{ .Annotations.summary }}
+          **Description:** {{ .Annotations.description }}
+          **Started:** {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
+          ---
+          {{ end }}
+          [Alertmanager](http://localhost:9093) | [Grafana](http://localhost:3000) | [Prometheus](http://localhost:9090)
