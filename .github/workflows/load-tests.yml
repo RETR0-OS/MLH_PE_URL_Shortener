@@ -251,15 +251,31 @@ jobs:
           echo ""
           echo "--- Loki / Promtail ---"
 
-          LOKI_READY=$(curl -sf http://localhost:3100/ready 2>/dev/null | grep -c "ready" || echo "0")
-          check "Loki is ready" "$([ "$LOKI_READY" -ge 1 ] && echo true || echo false)"
+          LOKI_OK="false"
+          for attempt in $(seq 1 6); do
+            LOKI_READY_RESP=$(curl -sf http://localhost:3100/ready 2>/dev/null || echo "")
+            if echo "$LOKI_READY_RESP" | grep -qi "ready"; then
+              LOKI_OK="true"; break
+            fi
+            echo "  Waiting for Loki to be ready (attempt $attempt/6)..."
+            sleep 5
+          done
+          check "Loki is ready" "$LOKI_OK"
 
-          LOKI_LOGS=$(curl -sf "http://localhost:3100/loki/api/v1/query?query=%7Bjob%3D%22app%22%7D&limit=5" 2>/dev/null || echo "{}")
-          HAS_LOGS=$(echo "$LOKI_LOGS" | json_check "
+          HAS_LOGS="false"
+          if [ "$LOKI_OK" = "true" ]; then
+            for attempt in $(seq 1 6); do
+              LOKI_LOGS=$(curl -sf "http://localhost:3100/loki/api/v1/query?query=%7Bjob%3D%22app%22%7D&limit=5" 2>/dev/null || echo "{}")
+              HAS_LOGS=$(echo "$LOKI_LOGS" | json_check "
           import sys,json
           data=json.load(sys.stdin)
           streams=data.get('data',{}).get('result',[])
           print('true' if len(streams) > 0 else 'false')" "false")
+              if [ "$HAS_LOGS" = "true" ]; then break; fi
+              echo "  Waiting for logs in Loki (attempt $attempt/6)..."
+              sleep 5
+            done
+          fi
           check "App logs flowing to Loki" "$HAS_LOGS"
 
           # ── 7. Grafana ────────────────────────────────────────────
