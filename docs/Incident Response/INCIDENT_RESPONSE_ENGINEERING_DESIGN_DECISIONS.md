@@ -49,17 +49,49 @@ This document records every design decision made for Track 3 (Incident Response)
 
 ## Visual Evidence (Screenshots)
 
-All screenshots are located in [`docs/Incident Response/screenshots/`](screenshots/) and demonstrate the live monitoring stack with real traffic data.
+All screenshots are located in `docs/Incident Response/screenshots/` and demonstrate the live monitoring stack with real traffic data.
 
-| Screenshot | Proves | Relevant Sections |
-|---|---|---|
-| [`metrics-endpoint.png`](screenshots/metrics-endpoint.png) | `/metrics` endpoint returns Prometheus metrics (`flask_http_request_total`, `flask_http_request_duration_seconds_bucket`, `process_resident_memory_bytes`, etc.) | [Decision B4](#decision-b4-prometheus-flask-exporter-for-metrics), Bronze evidence row 2 |
-| [`prometheus-alert-rules.png`](screenshots/prometheus-alert-rules.png) | 7 alert rules configured in Prometheus (ServiceDown, HighErrorRate, HighLatency, RedisDown, HighReplicaCount, HighRequestRate, HighMemoryUsage) | [Decision S1](#decision-s1-prometheus--alertmanager-over-grafana-alerting), Silver evidence row 1 |
-| [`alertmanager-ui.png`](screenshots/alertmanager-ui.png) | Alertmanager is running and processing alerts with severity-based routing | [Decision S2](#decision-s2-email-via-resend-smtp-as-primary-notification-channel), Silver evidence row 2 |
-| [`alertmanager-config.png`](screenshots/alertmanager-config.png) | Alertmanager configuration with email receivers (Resend SMTP), `group_wait: 0s` for critical, `group_wait: 10s` for warnings | [Decision S4](#decision-s4-alert-timing-tuned-for-sub-5-minute-delivery), Silver evidence row 3 |
-| [`grafana-golden-signals-dashboard.png`](screenshots/grafana-golden-signals-dashboard.png) | Grafana "Golden Signals" dashboard with 8 panels: Uptime, Active Alerts, Request Rate, Error Rate, Latency p50/p95/p99, Memory RSS, CPU %, Application Logs — all showing live data | [Decision G1](#decision-g1-single-golden-signals-dashboard-with-8-panels), Gold evidence row 1 |
-| [`grafana-loki-logs.png`](screenshots/grafana-loki-logs.png) | Centralized log viewing via Grafana + Loki without SSH — structured JSON logs queryable with `{job="app"}` | [Decision B5](#decision-b5-loki--promtail-for-ssh-free-log-inspection), Bronze evidence row 3 |
-| [`jaeger-tracing.png`](screenshots/jaeger-tracing.png) | Distributed tracing via Jaeger + OpenTelemetry showing request traces across services | [Architecture Overview](#architecture-overview), supplementary tracing evidence |
+### 1. `/metrics` Endpoint — [Decision B4](#decision-b4-prometheus-flask-exporter-for-metrics)
+
+Shows the live `/metrics` endpoint returning Prometheus metrics (`flask_http_request_total`, `flask_http_request_duration_seconds_bucket`, `process_resident_memory_bytes`, etc.)
+
+![Metrics Endpoint](screenshots/metrics-endpoint.png)
+
+### 2. Prometheus Alert Rules — [Decision S1](#decision-s1-prometheus--alertmanager-over-grafana-alerting)
+
+All 7 alert rules loaded in Prometheus (ServiceDown, HighErrorRate, HighLatency, RedisDown, HighReplicaCount, HighRequestRate, HighMemoryUsage) with their expressions and `for` durations.
+
+![Prometheus Alert Rules](screenshots/prometheus-alert-rules.png)
+
+### 3. Alertmanager UI — [Decision S2](#decision-s2-email-via-resend-smtp-as-primary-notification-channel)
+
+Alertmanager is running and processing alerts with severity-based routing.
+
+![Alertmanager UI](screenshots/alertmanager-ui.png)
+
+### 4. Alertmanager Configuration — [Decision S4](#decision-s4-alert-timing-tuned-for-sub-5-minute-delivery)
+
+Full Alertmanager configuration showing email receivers (Resend SMTP), `group_wait: 0s` for critical, `group_wait: 10s` for warnings.
+
+![Alertmanager Config](screenshots/alertmanager-config.png)
+
+### 5. Grafana Golden Signals Dashboard — [Decision G1](#decision-g1-single-golden-signals-dashboard-with-8-panels)
+
+Grafana "Golden Signals" dashboard with all 8 panels showing live data from k6 load testing (50 VUs, ~237 req/s): Uptime, Active Alerts, Request Rate, Error Rate, Latency p50/p95/p99, Memory RSS, CPU %, Application Logs.
+
+![Grafana Golden Signals Dashboard](screenshots/grafana-golden-signals-dashboard.png)
+
+### 6. Grafana Loki Logs — [Decision B5](#decision-b5-loki--promtail-for-ssh-free-log-inspection)
+
+Centralized log viewing via Grafana + Loki without SSH — structured JSON logs queryable with `{job="app"}`.
+
+![Grafana Loki Logs](screenshots/grafana-loki-logs.png)
+
+### 7. Jaeger Distributed Tracing — [Architecture Overview](#architecture-overview)
+
+Distributed tracing via Jaeger + OpenTelemetry showing request traces across services.
+
+![Jaeger Tracing](screenshots/jaeger-tracing.png)
 
 ---
 
@@ -116,7 +148,9 @@ All screenshots are located in [`docs/Incident Response/screenshots/`](screensho
 
 **Implementation:** `app/__init__.py` (lines 5, 12, 43, 84, 90, 95)
 
-> **Visual evidence:** [`metrics-endpoint.png`](screenshots/metrics-endpoint.png) — shows the live `/metrics` endpoint output with `flask_http_request_total`, `flask_http_request_duration_seconds_bucket`, and process metrics.
+> **Visual evidence:**
+>
+> ![Metrics Endpoint](screenshots/metrics-endpoint.png)
 
 ### Decision B5: Loki + Promtail for SSH-free log inspection
 
@@ -138,7 +172,9 @@ All screenshots are located in [`docs/Incident Response/screenshots/`](screensho
 - `monitoring/grafana/dashboards/url-shortener.json` (lines 162-177) — "Application Logs" panel querying `{job="app"}`.
 - `monitoring/grafana/provisioning/datasources/datasources.yml` (lines 11-17) — Loki datasource.
 
-> **Visual evidence:** [`grafana-loki-logs.png`](screenshots/grafana-loki-logs.png) — shows the Grafana Explore view querying Loki with `{job="app"}`, displaying structured JSON application logs without SSH access.
+> **Visual evidence:**
+>
+> ![Grafana Loki Logs](screenshots/grafana-loki-logs.png)
 
 ---
 
@@ -158,7 +194,9 @@ All screenshots are located in [`docs/Incident Response/screenshots/`](screensho
 - `monitoring/prometheus/alerts.yml` — 7 rules across 2 groups.
 - `monitoring/alertmanager/alertmanager.yml` — Routing tree with severity-based receiver selection.
 
-> **Visual evidence:** [`prometheus-alert-rules.png`](screenshots/prometheus-alert-rules.png) — shows all 7 alert rules loaded in Prometheus with their expressions and `for` durations.
+> **Visual evidence:**
+>
+> ![Prometheus Alert Rules](screenshots/prometheus-alert-rules.png)
 
 ### Decision S2: Email (via Resend SMTP) as primary notification channel
 
@@ -180,7 +218,11 @@ All screenshots are located in [`docs/Incident Response/screenshots/`](screensho
 - Two receivers: `email-critical` (lines 22-56), `email-warnings` (lines 58-91).
 - Critical alerts: `group_wait: 0s`, `repeat_interval: 15m`. Warnings: `group_wait: 10s`, `repeat_interval: 1h`.
 
-> **Visual evidence:** [`alertmanager-ui.png`](screenshots/alertmanager-ui.png) — shows the Alertmanager UI with active routing. [`alertmanager-config.png`](screenshots/alertmanager-config.png) — shows the full Alertmanager configuration including SMTP settings, receivers, and group_wait timings.
+> **Visual evidence:**
+>
+> ![Alertmanager UI](screenshots/alertmanager-ui.png)
+>
+> ![Alertmanager Config](screenshots/alertmanager-config.png)
 
 ### Decision S3: Discord as opt-in secondary channel
 
@@ -250,7 +292,9 @@ All screenshots are located in [`docs/Incident Response/screenshots/`](screensho
 
 **Implementation:** `monitoring/grafana/dashboards/url-shortener.json`
 
-> **Visual evidence:** [`grafana-golden-signals-dashboard.png`](screenshots/grafana-golden-signals-dashboard.png) — shows the live dashboard with all 8 panels populated with real traffic data from k6 load testing (50 VUs, ~237 req/s).
+> **Visual evidence:**
+>
+> ![Grafana Golden Signals Dashboard](screenshots/grafana-golden-signals-dashboard.png)
 
 ### Decision G2: Grafana auto-provisioning via file-based providers
 
@@ -343,7 +387,9 @@ All screenshots are located in [`docs/Incident Response/screenshots/`](screensho
 5. Grafana → Prometheus + Loki: Dashboards query both datasources. Logs panel uses Loki, all other panels use Prometheus.
 6. App → Jaeger: OpenTelemetry traces exported via OTLP/gRPC.
 
-> **Visual evidence:** [`jaeger-tracing.png`](screenshots/jaeger-tracing.png) — shows the Jaeger UI with distributed traces from the URL Shortener service.
+> **Visual evidence:**
+>
+> ![Jaeger Tracing](screenshots/jaeger-tracing.png)
 
 ---
 
