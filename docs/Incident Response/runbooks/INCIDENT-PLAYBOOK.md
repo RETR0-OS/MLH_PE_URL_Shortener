@@ -88,7 +88,7 @@ Apply the fix from the runbook. Verify by:
 - Watching Prometheus for the alert to clear (may take 1-3 min)
 
 ### 6. **Communicate** (during mitigation)
-Update the status channel (Slack, team chat, email):
+Update the team via GitHub issue or email:
 - **At detection**: "URL Shortener P2 alert: HighErrorRate. Investigating."
 - **During mitigation**: "Root cause found: Redis OOM kill. Restarting Redis."
 - **At resolution**: "Resolved. Error rate back to <1%. Redis recovered. No data loss."
@@ -255,20 +255,22 @@ docker compose up -d app  # Uses previous image if still available
 
 | Time Elapsed | Action | Who |
 |--------------|--------|-----|
-| 0-5 min | Alert received, acknowledge in Slack | On-call engineer |
+| 0-5 min | Alert received, acknowledge via GitHub issue or email | On-call engineer |
 | 5-15 min | Diagnose using runbook | On-call engineer |
 | 15-30 min | If not resolved, loop in team lead | On-call + team lead |
-| 30+ min | Page backup on-call, consider rollback or code change | Team |
+| 30+ min | Contact backup engineer, consider rollback or code change | Team |
 | 1+ hour | Post incident update, coordinate postmortem | Team lead |
 
-**On-Call Contact**:
-- Primary: [Defined in team rotation]
-- Backup: [Defined in team rotation]
-- Team Lead: [Defined in team rotation]
+**On-Call Contacts**:
+| Role | GitHub | Email |
+|------|--------|-------|
+| Primary On-Call | [@devgunnu](https://github.com/devgunnu) | gunbirsingh2006@gmail.com |
+| Backup On-Call | [@RETR0-OS](https://github.com/RETR0-OS) | ajinda17@asu.edu |
+| Team | [@aryankhanna2004](https://github.com/aryankhanna2004), [@SinghOPS](https://github.com/SinghOPS) | — |
 
 **Notification channels**:
-- Slack: #incidents
-- Email: oncall@urlshortener.local (configured in `ALERT_EMAIL_TO`)
+- GitHub: Open an issue at https://github.com/RETR0-OS/MLH_PE_URL_Shortener/issues
+- Email: gunbirsingh2006@gmail.com / ajinda17@asu.edu (configured in `ALERT_EMAIL_TO`)
 
 ---
 
@@ -279,99 +281,258 @@ These are brief summaries of each alert. Full details are below.
 ### ServiceDown
 
 **Alert fires**: App instance unreachable for >1 minute.
+**Severity**: P1 — Service completely down.
+**Escalate if not resolved in**: 15 minutes → page team lead.
 
-**Immediate checks**:
-1. `docker compose ps` — Are containers running?
-2. `docker compose logs app --tail 50` — Any crash logs?
-3. `curl http://localhost/health` — Does the service respond?
+**Step 1 — Confirm the alert is real** (0–2 min):
+```bash
+curl -s -o /dev/null -w "%{http_code}" http://localhost/health
+# If 200: alert is stale (already recovered). Monitor for 2 min, then silence if stable.
+# If non-200 or connection refused: proceed to Step 2.
+```
 
-**Common causes**:
-- Postgres is down → app can't start
-- Port 5000 is already in use
-- Out of memory (OOM kill)
-- Container crash in startup
+**Step 2 — Identify the failed component** (2–5 min):
+```bash
+# Check all service states
+docker compose ps
 
-**Mitigation**:
-1. Check Postgres: `docker compose ps postgres` and `docker compose logs postgres`
-2. If Postgres is down, restart it: `docker compose restart postgres`
-3. If app still won't start, check dependencies: `docker compose up app` (not detached) to see the error
-4. If OOM: scale down replicas (`docker compose up -d --scale app=1`) and investigate memory leak
+# Check app crash logs
+docker compose logs app --tail 50
 
-**Expected recovery time**: 5-15 seconds (after Postgres or dependencies recover).
+# Check if Postgres is the blocker
+docker compose ps postgres
+docker compose exec postgres pg_isready -U postgres
+```
+
+**Step 3 — Mitigation by root cause** (5–10 min):
+
+If Postgres is down:
+```bash
+docker compose restart postgres
+# Wait 15s for health check, then:
+docker compose restart app
+curl -s http://localhost/health/ready | jq .
+```
+
+If app is OOM-killed:
+```bash
+docker stats --no-stream | grep app
+# If memory > 384MB per replica, scale down:
+docker compose up -d --scale app=1
+docker compose logs app --tail 30
+```
+
+If port conflict or startup crash:
+```bash
+# Run attached to see startup error:
+docker compose stop app
+docker compose up app   # NOT -d, so you see the error
+# Ctrl-C once you see the cause, fix it, then:
+docker compose up -d app
+```
+
+**Step 4 — Verify recovery**:
+```bash
+curl -s http://localhost/health/ready | jq .
+# Must return: {"status": "ok"}
+docker compose ps | grep app
+# Must show 2+ "Up" entries
+```
+
+**Expected recovery time**: 5–15 seconds after Postgres or dependencies recover.
+**Escalate if not resolved in 15 minutes**: page team lead with current `docker compose ps` output and last 100 lines of `docker compose logs app`.
 
 ### HighErrorRate
 
 **Alert fires**: 5xx error rate exceeds 5% for >30 seconds.
+**Severity**: P2 — User-facing errors.
+**Escalate if not resolved in**: 20 minutes → page team lead + consider rollback.
 
-**Immediate checks**:
-1. Grafana "Error Rate" panel — which endpoints are failing?
-2. Grafana "Traffic" panel — did traffic spike?
-3. `docker compose logs app | grep ERROR` — any application errors?
-4. `docker compose ps` — all replicas healthy?
+**Step 1 — Identify which endpoint is failing** (0–3 min):
+```bash
+# Check error logs with context
+docker compose logs app --tail 100 | grep -E '"status": 5'
 
-**Common causes**:
-- Database connection pool exhausted
-- Unhandled exception in code
-- Cascading failure from dependency (Postgres, Redis)
-- Traffic spike overwhelming the app
+# Check active DB connections (should be < 80 out of 100 max)
+docker compose exec postgres psql -U postgres -c \
+  "SELECT count(*) FROM pg_stat_activity WHERE state != 'idle';"
 
-**Mitigation**:
-1. If DB connection errors, check Postgres: `docker compose exec postgres psql -U postgres -c "SELECT count(*) FROM pg_stat_activity;"` (should be <80% of max_connections=100)
-2. If Redis errors, Redis is likely down (expected behavior — circuit breaker engages). Not user-facing.
-3. If specific endpoint is broken, check app logs for stack traces.
-4. Scale up: `docker compose up -d --scale app=3`
-5. If still high after scaling, consider rollback: `git revert HEAD && docker compose up -d --build app`
+# Check container health
+docker compose ps
+```
 
-**Expected recovery time**: 2-5 minutes (after app restart or scale-up).
+**Step 2 — Match to root cause**:
+
+If DB connection errors in logs:
+```bash
+# Check connection pool saturation
+docker compose exec postgres psql -U postgres -c \
+  "SELECT count(*), state FROM pg_stat_activity GROUP BY state;"
+# If > 80 active: connection pool is exhausted
+docker compose restart app   # Forces pool reconnection
+```
+
+If unhandled exception / code bug:
+```bash
+# Get full stack traces
+docker compose logs app --tail 200 | grep -A 10 "Traceback\|ERROR"
+# If from a recent deploy → rollback:
+cd /root/MLH_PE_URL_Shortener
+git log --oneline -5   # Note the previous commit SHA
+git revert HEAD --no-edit
+docker compose up -d --build
+```
+
+If traffic spike:
+```bash
+# Scale up replicas
+docker compose up -d --scale app=3
+# Wait 30s for new replicas to warm up, then re-check error rate in Grafana
+```
+
+**Step 3 — Verify recovery**:
+```bash
+# Poll error rate for 60 seconds
+for i in $(seq 1 6); do
+  curl -s "http://localhost:9090/api/v1/query?query=sum(rate(flask_http_request_total{status=~'5..'}[30s]))/sum(rate(flask_http_request_total[30s]))*100" \
+    | jq '.data.result[0].value[1]' 2>/dev/null || echo "0"
+  sleep 10
+done
+# All values should be below 1.0 (1%)
+```
+
+**Expected recovery time**: 2–5 minutes after restart or scale-up.
+**Escalate if not resolved in 20 minutes**: share current error rate (from Prometheus query above) and last 200 log lines with team lead.
 
 ### HighLatency
 
 **Alert fires**: p95 latency exceeds 500ms for >30 seconds.
+**Severity**: P2 — Performance degradation, SLO at risk.
+**Escalate if not resolved in**: 20 minutes → review capacity plan, consider droplet upgrade.
 
-**Immediate checks**:
-1. Grafana "Request Duration" panel — is p95 consistently high?
-2. Grafana "Traffic" panel — did traffic spike?
-3. Grafana "CPU" and "Memory" panels — are resources maxed out?
-4. `docker stats` — individual container memory/CPU?
+**Step 1 — Confirm and characterise** (0–3 min):
+```bash
+# Check current p95 latency
+curl -s "http://localhost:9090/api/v1/query?query=histogram_quantile(0.95,sum(rate(flask_http_request_duration_seconds_bucket[5m]))by(le))*1000" \
+  | jq '.data.result[0].value[1]'
+# If < 500: alert is clearing. Monitor for 2 min.
 
-**Common causes**:
-- Traffic spike (legitimate or attack)
-- Redis down → cache misses → slower DB reads
-- Postgres under heavy load (cold cache, slow query)
-- Insufficient app replicas
+# Check if it's traffic-driven
+curl -s "http://localhost:9090/api/v1/query?query=sum(rate(flask_http_request_total[5m]))" \
+  | jq '.data.result[0].value[1]'
+# Compare to baseline: ~100 req/s is normal, > 400 req/s may require scaling
 
-**Mitigation**:
-1. Scale up app replicas: `docker compose up -d --scale app=3` (practical ceiling on this hardware is 3 replicas)
-2. Check Redis: `docker compose logs redis | tail 20`. If down, it will auto-restart.
-3. Warm the cache by accessing popular URLs.
-4. If latency doesn't improve with 3 replicas, the bottleneck is Postgres. Document in CAPACITY_PLAN and consider infrastructure upgrade.
+# Check container CPU and memory
+docker stats --no-stream
+```
 
-**Expected recovery time**: 1-3 minutes (after scaling).
+**Step 2 — Match to root cause**:
+
+If traffic spike (request rate > 400 req/s):
+```bash
+# Scale up replicas (max 3 on 2 GB droplet)
+docker compose up -d --scale app=3
+# Wait 30s for new replica to warm up
+```
+
+If Redis is down (cache misses causing DB load):
+```bash
+docker compose ps redis
+docker compose exec redis redis-cli ping
+# If Redis is down, it will auto-restart. Wait 30s for recovery.
+# Latency will be elevated (~200ms p95) until Redis is back and cache refills.
+```
+
+If Postgres is slow (high DB latency):
+```bash
+# Find slow queries
+docker compose exec postgres psql -U postgres -d hackathon_db \
+  -c "SELECT query, calls, mean_exec_time FROM pg_stat_statements ORDER BY mean_exec_time DESC LIMIT 5;"
+# If a specific query is slow, check EXPLAIN ANALYZE
+```
+
+**Step 3 — Verify recovery**:
+```bash
+# Watch p95 latency trend over 2 minutes
+for i in $(seq 1 6); do
+  echo -n "$(date +%H:%M:%S) p95: "
+  curl -s "http://localhost:9090/api/v1/query?query=histogram_quantile(0.95,sum(rate(flask_http_request_duration_seconds_bucket[2m]))by(le))*1000" \
+    | jq -r '.data.result[0].value[1]' 2>/dev/null || echo "no data"
+  sleep 20
+done
+# Should trend downward toward < 100ms
+```
+
+**Expected recovery time**: 1–3 minutes after scaling or Redis recovery.
+**Escalate if not resolved in 20 minutes**: the bottleneck is hardware (see `docs/CAPACITY_PLAN.md` Phase 2 — droplet upgrade required).
 
 ### RedisDown
 
 **Alert fires**: Redis connection errors detected for >1 minute.
+**Severity**: P3 — No user-facing errors (circuit breaker active), but latency is elevated.
+**Escalate if not resolved in**: 30 minutes → investigate OOM kill or hardware issue.
 
-**Immediate checks**:
-1. `docker compose ps redis` — is Redis container running?
-2. `docker compose exec redis redis-cli ping` — does it respond?
-3. `docker compose logs redis | tail 50` — any error messages?
-4. `docker compose exec redis redis-cli info memory` — memory usage?
+**IMPORTANT**: The circuit breaker is active. Reads fall back to PostgreSQL automatically. Users see higher latency (~200ms p95) but zero errors. This is NOT an emergency.
 
-**Immediate impact**: NONE. The app has a circuit breaker that falls back to direct database reads. Latency will increase, but no user-facing errors.
+**Step 1 — Assess Redis state** (0–2 min):
+```bash
+# Check Redis container status
+docker compose ps redis
 
-**Common causes**:
-- Redis OOM killed (memory limit exceeded)
-- Redis crash or hang
-- Network connectivity issue
+# Try to ping Redis
+docker compose exec redis redis-cli ping
+# Expected: PONG (if running), or connection refused (if down)
 
-**Mitigation**:
-1. If Redis is down, it will auto-restart due to `restart: unless-stopped` in docker-compose.yml.
-2. Wait 30 seconds for Redis to restart and reconnect.
-3. If Redis keeps crashing, check logs: `docker compose logs redis`
-4. If OOM kill, consider reducing cache TTL or checking for memory leak. Or increase `maxmemory` from 128MB to 256MB if hardware allows.
+# Check Redis logs for crash reason
+docker compose logs redis --tail 50
 
-**Expected recovery time**: 30 seconds (auto-restart), no manual intervention needed.
+# Check if it was OOM-killed (look for exit code 137)
+docker inspect $(docker compose ps -q redis) | jq '.[0].State.ExitCode'
+# 137 = OOM kill, 1 = crash, 0 = clean exit
+```
+
+**Step 2 — Mitigation**:
+
+If Redis is down and NOT auto-restarting:
+```bash
+# Force restart
+docker compose restart redis
+# Wait 15s then verify:
+docker compose exec redis redis-cli ping
+# Expected: PONG
+```
+
+If Redis keeps OOM-killing (memory leak):
+```bash
+# Check memory usage before it crashes again
+docker compose exec redis redis-cli info memory | grep used_memory_human
+# If > 120MB out of 128MB limit, it's about to OOM again
+
+# Immediate: flush cache to buy time (safe — app will refill from DB)
+docker compose exec redis redis-cli flushall
+# This causes a temporary spike in DB load as cache is cold
+
+# Permanent: increase Redis memory limit (requires docker-compose.yml edit)
+# Change: command: --maxmemory 128mb   →   --maxmemory 256mb
+# Then: docker compose up -d redis
+```
+
+**Step 3 — Verify recovery**:
+```bash
+docker compose exec redis redis-cli ping
+# Must return: PONG
+
+# Verify circuit breaker has closed (app reconnected to Redis)
+docker compose logs app --tail 20 | grep -i redis
+# Should see no "Redis unavailable" messages after recovery
+
+# Check latency returned to baseline (< 50ms p95)
+curl -s "http://localhost:9090/api/v1/query?query=histogram_quantile(0.95,sum(rate(flask_http_request_duration_seconds_bucket[5m]))by(le))*1000" \
+  | jq '.data.result[0].value[1]'
+```
+
+**Expected recovery time**: 30 seconds (auto-restart). No manual intervention needed unless crash-looping.
+**Escalate if not resolved in 30 minutes**: Redis is crash-looping. Share `docker compose logs redis --tail 100` output with team lead.
 
 ---
 
@@ -433,13 +594,13 @@ These describe expected behavior under failure:
 
 ## 11. Memory & Capacity Limits
 
-Your hardware has **4 GB RAM** total; ~3.3 GB available for services.
+Your hardware has **2 GB RAM** total; ~1.8 GB available for services.
 
 ### Service Memory Budget
 
 | Service | Limit | Current Config |
 |---------|-------|-----------------|
-| App (per replica) | 384 MB | 2-3 replicas |
+| App (per replica) | 384 MB | 2-5 replicas |
 | Postgres | 768 MB | Fixed 1 instance |
 | Redis | 160 MB | Fixed 1 instance |
 | Nginx | 64 MB | Fixed 1 instance |
@@ -447,14 +608,19 @@ Your hardware has **4 GB RAM** total; ~3.3 GB available for services.
 | Loki | 256 MB | Fixed 1 instance |
 | Grafana | 256 MB | Fixed 1 instance |
 | Alertmanager | 128 MB | Fixed 1 instance |
+| Jaeger | 256 MB | Fixed 1 instance |
+| Promtail | 128 MB | Fixed 1 instance |
+| Autoscaler | 64 MB | Fixed 1 instance |
 
-**Formula**: `Total = (app_replicas * 384MB) + 2176MB (fixed services)`
+**Formula**: `Total = (app_replicas * 384MB) + 2592MB (fixed services)`
 
-- **2 replicas**: ~2.92 GB (safe, 12% headroom)
-- **3 replicas**: ~3.30 GB (tight, ~0% headroom)
-- **4 replicas**: ~3.7 GB (OUT OF MEMORY, don't do this)
+Note: The combined Docker memory limits exceed the 2 GB droplet RAM. Docker limits are upper bounds; actual RSS usage is lower. The system runs on the 2 GB droplet because limits are rarely hit simultaneously, and Linux overcommits memory. Monitor with `docker stats` to see actual usage.
 
-**Action**: If memory usage >3 GB, scale app down to 1 replica or restart services.
+- **2 replicas**: ~3.36 GB limits (~1.8–2.2 GB actual RSS typical)
+- **3 replicas**: ~3.74 GB limits (tight — watch actual RSS closely)
+- **4 replicas**: ~4.13 GB limits (high risk of OOMKill)
+
+**Action**: If actual RSS usage (from `docker stats`) exceeds 1.8 GB, scale app down to 1 replica or restart services.
 
 ---
 
@@ -515,7 +681,7 @@ Keep these docs handy:
 - [ ] You can SSH/access the server hosting Docker
 - [ ] You have docker-compose commands aliased or in your PATH
 - [ ] You've read the runbook summaries in section 8 and the failure modes in section 10
-- [ ] You have a way to be notified (email, Slack, phone)
+- [ ] You have a way to be notified (email or GitHub)
 - [ ] You know how to reach the backup on-call engineer
 - [ ] You have the postmortem template URL bookmarked
 
@@ -599,8 +765,8 @@ RESOLVED - URL Shortener [AlertName]
 
 ## Monitoring
 - Primary dashboard: http://localhost:3000 (URL Shortener - Golden Signals)
-- Alert channel: #incidents Slack
-- Escalation: [phone number or contact]
+- Alert channel: gunbirsingh2006@gmail.com / ajinda17@asu.edu
+- Escalation: [@devgunnu](https://github.com/devgunnu) → [@RETR0-OS](https://github.com/RETR0-OS)
 
 ## Key Docs
 - Incident playbook: `docs/Incident Response/runbooks/INCIDENT-PLAYBOOK.md`
@@ -618,9 +784,10 @@ Questions for the outgoing engineer: [ask here]
 
 | Role | Contact | Backup |
 |------|---------|--------|
-| On-Call Engineer | [Phone / Slack] | [Backup number] |
-| Team Lead | [Phone / Slack] | [Backup number] |
-| SRE Lead | [Phone / Slack] | [Backup number] |
+| @devgunnu (Gunbir Singh) | gunbirsingh2006@gmail.com | [@devgunnu](https://github.com/devgunnu) |
+| @RETR0-OS (Aaditya Jindal) | ajinda17@asu.edu | [@RETR0-OS](https://github.com/RETR0-OS) |
+| @aryankhanna2004 (Aryan Khanna) | — | [@aryankhanna2004](https://github.com/aryankhanna2004) |
+| @SinghOPS (Sahajpreet Singh) | — | [@SinghOPS](https://github.com/SinghOPS) |
 
 ---
 
