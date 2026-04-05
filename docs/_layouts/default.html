@@ -39,23 +39,30 @@
       gap: 8px;
     }
     .nav-brand .dot { color: #58a6ff; }
-    .nav-links { display: flex; gap: 4px; }
+    .nav-links { display: flex; gap: 6px; flex-wrap: wrap; }
     .nav-links a {
       font-size: 13px;
       font-weight: 500;
       color: #8b949e;
       text-decoration: none;
-      padding: 6px 12px;
+      padding: 6px 14px;
       border-radius: 6px;
+      white-space: nowrap;
       transition: color .15s, background .15s;
     }
     .nav-links a:hover { color: #e6edf3; background: #161b22; }
 
+    @media (max-width: 900px) {
+      nav { height: auto; padding: 12px 20px; flex-wrap: wrap; gap: 8px; }
+      .nav-links { gap: 4px; }
+      .nav-links a { font-size: 12px; padding: 5px 10px; }
+    }
+
     /* ── Page wrapper ────────────────────────────────── */
     .page-wrap {
-      max-width: 860px;
+      max-width: 960px;
       margin: 0 auto;
-      padding: 48px 24px 80px;
+      padding: 48px 32px 80px;
     }
 
     /* ── Breadcrumb ──────────────────────────────────── */

@@ -60,26 +60,29 @@ title: Home
     letter-spacing: .1em;
     text-transform: uppercase;
     color: #58a6ff;
-    margin-bottom: 18px;
+    margin-bottom: 20px;
   }
 
   .tracks {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-    gap: 14px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px;
     margin-bottom: 52px;
+  }
+  @media (max-width: 640px) {
+    .tracks { grid-template-columns: 1fr; }
   }
   .card {
     background: #161b22;
     border: 1px solid #21262d;
     border-radius: 12px;
-    padding: 22px;
+    padding: 24px;
     text-decoration: none !important;
     color: inherit !important;
     transition: border-color .15s, transform .15s;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
   }
   .card:hover { border-color: #58a6ff; transform: translateY(-2px); }
   .card-icon { font-size: 26px; line-height: 1; }
@@ -89,19 +92,19 @@ title: Home
 
   .refs {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
-    gap: 10px;
-    margin-bottom: 48px;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px;
+    margin-bottom: 52px;
   }
   .ref-item {
     background: #161b22;
     border: 1px solid #21262d;
     border-radius: 8px;
-    padding: 14px 16px;
+    padding: 16px 18px;
     text-decoration: none !important;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
     transition: border-color .15s;
   }
   .ref-item:hover { border-color: #58a6ff; }
@@ -111,14 +114,14 @@ title: Home
   .stack {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    padding-top: 32px;
+    gap: 10px;
+    padding-top: 36px;
     border-top: 1px solid #21262d;
   }
   .badge {
     font-size: 12px;
     font-weight: 500;
-    padding: 4px 10px;
+    padding: 5px 12px;
     border-radius: 6px;
     background: #21262d;
     color: #8b949e;
