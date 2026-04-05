@@ -80,11 +80,11 @@ jobs:
       - name: Load test (500 VUs)
         run: k6 run --env BASE_URL=http://localhost:80 --summary-export=k6-summary.json loadtests/stress.js 2>&1 | tee k6-output.txt
 
-      - name: Verify monitoring stack
+      - name: Verify infrastructure stack
         id: monitoring
         if: always()
         run: |
-          echo "=== Observability Stack Smoke Tests ==="
+          echo "=== Infrastructure Stack Smoke Tests ==="
           RESULTS_FILE=$(mktemp)
           PASS=0; FAIL=0
 
@@ -103,9 +103,128 @@ jobs:
             python3 -c "$1" 2>/dev/null || echo "$2"
           }
 
-          # 1. Prometheus scraped app metrics
+          # ── 1. Nginx ──────────────────────────────────────────────
+          echo ""
+          echo "--- Nginx ---"
+
+          HTTPS_STATUS=$(curl -kso /dev/null -w "%{http_code}" https://localhost:443/health 2>/dev/null || echo "000")
+          check "HTTPS (TLS) endpoint responds" "$([ "$HTTPS_STATUS" = "200" ] && echo true || echo false)"
+
+          HEADERS=$(curl -sI http://localhost:80/health 2>/dev/null || echo "")
+          check "X-Frame-Options header" "$(echo "$HEADERS" | grep -qi 'X-Frame-Options' && echo true || echo false)"
+          check "X-Content-Type-Options header" "$(echo "$HEADERS" | grep -qi 'X-Content-Type-Options' && echo true || echo false)"
+          check "X-XSS-Protection header" "$(echo "$HEADERS" | grep -qi 'X-XSS-Protection' && echo true || echo false)"
+          check "Referrer-Policy header" "$(echo "$HEADERS" | grep -qi 'Referrer-Policy' && echo true || echo false)"
+          check "Permissions-Policy header" "$(echo "$HEADERS" | grep -qi 'Permissions-Policy' && echo true || echo false)"
+
+          CORS_HEADERS=$(curl -sI -X OPTIONS http://localhost:80/urls 2>/dev/null || echo "")
+          check "CORS Access-Control-Allow-Origin" "$(echo "$CORS_HEADERS" | grep -qi 'Access-Control-Allow-Origin' && echo true || echo false)"
+          check "CORS Access-Control-Allow-Methods" "$(echo "$CORS_HEADERS" | grep -qi 'Access-Control-Allow-Methods' && echo true || echo false)"
+
+          UPSTREAMS=""
+          for i in $(seq 1 6); do
+            ADDR=$(curl -sI http://localhost:80/health 2>/dev/null | grep -i 'X-Upstream' || \
+                   curl -so /dev/null -w "%{remote_ip}" http://localhost:80/health 2>/dev/null || echo "")
+            UPSTREAMS="$UPSTREAMS $ADDR"
+          done
+          REPLICA_COUNT=$(docker compose ps --format json 2>/dev/null | python3 -c "
+          import sys,json
+          lines=sys.stdin.read().strip().split('\n')
+          count=sum(1 for l in lines if l.strip() for d in [json.loads(l)] if 'app' in d.get('Service','') and d.get('State')=='running')
+          print(count)" 2>/dev/null || echo "0")
+          check "Multiple app replicas running ($REPLICA_COUNT)" "$([ "$REPLICA_COUNT" -ge 2 ] && echo true || echo false)"
+
+          # ── 2. Redis (caching) ────────────────────────────────────
+          echo ""
+          echo "--- Redis / Caching ---"
+
+          REDIS_PING=$(docker compose exec -T redis redis-cli ping 2>/dev/null || echo "")
+          check "Redis responds to PING" "$([ "$REDIS_PING" = "PONG" ] && echo true || echo false)"
+
+          TEST_USER=$(curl -sf -X POST http://localhost:80/users \
+            -H "Content-Type: application/json" \
+            -d '{"username":"cache_test_'"$$"'","email":"cache_test_'"$$"'@test.local"}' 2>/dev/null || echo "{}")
+          TEST_USER_ID=$(echo "$TEST_USER" | json_check "import sys,json; print(json.load(sys.stdin).get('id',''))" "")
+
+          if [ -n "$TEST_USER_ID" ]; then
+            TEST_URL=$(curl -sf -X POST http://localhost:80/urls \
+              -H "Content-Type: application/json" \
+              -d '{"user_id":'"$TEST_USER_ID"',"original_url":"https://example.com/cache-test-'"$$"'","title":"cache test"}' 2>/dev/null || echo "{}")
+            TEST_URL_ID=$(echo "$TEST_URL" | json_check "import sys,json; print(json.load(sys.stdin).get('id',''))" "")
+
+            if [ -n "$TEST_URL_ID" ]; then
+              curl -sf http://localhost:80/urls/"$TEST_URL_ID" > /dev/null 2>&1
+              sleep 0.5
+              DBSIZE_BEFORE=$(docker compose exec -T redis redis-cli DBSIZE 2>/dev/null | grep -o '[0-9]*' || echo "0")
+              check "Redis has cached entries ($DBSIZE_BEFORE keys)" "$([ "$DBSIZE_BEFORE" -ge 1 ] && echo true || echo false)"
+
+              curl -sf http://localhost:80/urls/"$TEST_URL_ID" > /dev/null 2>&1
+              DBSIZE_AFTER=$(docker compose exec -T redis redis-cli DBSIZE 2>/dev/null | grep -o '[0-9]*' || echo "0")
+              check "Cache stable on repeated GET (no key explosion)" "$([ "$DBSIZE_AFTER" -le $((DBSIZE_BEFORE + 5)) ] && echo true || echo false)"
+            else
+              check "Redis cache entries (skipped - URL creation failed)" "false"
+              check "Cache repeated GET (skipped)" "false"
+            fi
+          else
+            check "Redis cache entries (skipped - user creation failed)" "false"
+            check "Cache repeated GET (skipped)" "false"
+          fi
+
+          # ── 3. Jaeger (tracing) ───────────────────────────────────
+          echo ""
+          echo "--- Jaeger / Tracing ---"
+
+          JAEGER_HEALTH=$(curl -sf http://localhost:16686/ -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
+          check "Jaeger UI accessible" "$([ "$JAEGER_HEALTH" = "200" ] && echo true || echo false)"
+
+          JAEGER_SERVICES=$(curl -sf "http://localhost:16686/api/services" 2>/dev/null || echo "{}")
+          HAS_SERVICE=$(echo "$JAEGER_SERVICES" | json_check "
+          import sys,json
+          data=json.load(sys.stdin)
+          services=data.get('data',[])
+          print('true' if 'url-shortener' in services else 'false')" "false")
+          check "Jaeger has url-shortener service" "$HAS_SERVICE"
+
+          JAEGER_TRACES=$(curl -sf "http://localhost:16686/api/traces?service=url-shortener&limit=5&lookback=1h" 2>/dev/null || echo "{}")
+          TRACE_COUNT=$(echo "$JAEGER_TRACES" | json_check "
+          import sys,json
+          data=json.load(sys.stdin)
+          print(len(data.get('data',[])))" "0")
+          check "Traces flowing to Jaeger ($TRACE_COUNT found)" "$([ "$TRACE_COUNT" -ge 1 ] && echo true || echo false)"
+
+          # ── 4. PostgreSQL (database) ──────────────────────────────
+          echo ""
+          echo "--- PostgreSQL ---"
+
+          PG_READY=$(docker compose exec -T postgres pg_isready -U postgres 2>/dev/null | grep -c "accepting connections" || echo "0")
+          check "PostgreSQL accepting connections" "$([ "$PG_READY" -ge 1 ] && echo true || echo false)"
+
+          PG_CONN_COUNT=$(docker compose exec -T postgres psql -U postgres -d hackathon_db -tAc \
+            "SELECT count(*) FROM pg_stat_activity WHERE datname='hackathon_db';" 2>/dev/null || echo "0")
+          PG_CONN_COUNT=$(echo "$PG_CONN_COUNT" | tr -d '[:space:]')
+          PG_MAX_CONN=$(docker compose exec -T postgres psql -U postgres -tAc "SHOW max_connections;" 2>/dev/null || echo "100")
+          PG_MAX_CONN=$(echo "$PG_MAX_CONN" | tr -d '[:space:]')
+          check "DB connections not exhausted ($PG_CONN_COUNT/$PG_MAX_CONN)" "$([ "$PG_CONN_COUNT" -lt "$PG_MAX_CONN" ] && echo true || echo false)"
+
+          URL_COUNT=$(docker compose exec -T postgres psql -U postgres -d hackathon_db -tAc \
+            "SELECT count(*) FROM urls;" 2>/dev/null || echo "0")
+          URL_COUNT=$(echo "$URL_COUNT" | tr -d '[:space:]')
+          check "URLs created during load test ($URL_COUNT rows)" "$([ "$URL_COUNT" -ge 1 ] && echo true || echo false)"
+
+          USER_COUNT=$(docker compose exec -T postgres psql -U postgres -d hackathon_db -tAc \
+            "SELECT count(*) FROM users;" 2>/dev/null || echo "0")
+          USER_COUNT=$(echo "$USER_COUNT" | tr -d '[:space:]')
+          check "Users created during load test ($USER_COUNT rows)" "$([ "$USER_COUNT" -ge 1 ] && echo true || echo false)"
+
+          ORPHAN_URLS=$(docker compose exec -T postgres psql -U postgres -d hackathon_db -tAc \
+            "SELECT count(*) FROM urls u LEFT JOIN users usr ON u.user_id=usr.id WHERE u.user_id IS NOT NULL AND usr.id IS NULL;" 2>/dev/null || echo "-1")
+          ORPHAN_URLS=$(echo "$ORPHAN_URLS" | tr -d '[:space:]')
+          check "No orphaned URL→User references ($ORPHAN_URLS)" "$([ "$ORPHAN_URLS" = "0" ] && echo true || echo false)"
+
+          # ── 5. Prometheus ─────────────────────────────────────────
           echo ""
           echo "--- Prometheus ---"
+
           PROM_TARGETS=$(curl -sf http://localhost:9090/api/v1/targets 2>/dev/null || echo "{}")
           APP_UP=$(echo "$PROM_TARGETS" | json_check "
           import sys,json
@@ -121,9 +240,17 @@ jobs:
           print('true' if len(data.get('data',{}).get('result',[])) > 0 else 'false')" "false")
           check "Flask HTTP metrics in Prometheus" "$HAS_FLASK"
 
-          # 2. Loki receiving logs via Promtail
+          LATENCY_METRIC=$(curl -sf "http://localhost:9090/api/v1/query?query=flask_http_request_duration_seconds_bucket" 2>/dev/null || echo "{}")
+          HAS_LATENCY=$(echo "$LATENCY_METRIC" | json_check "
+          import sys,json
+          data=json.load(sys.stdin)
+          print('true' if len(data.get('data',{}).get('result',[])) > 0 else 'false')" "false")
+          check "Latency histogram buckets in Prometheus" "$HAS_LATENCY"
+
+          # ── 6. Loki / Promtail ────────────────────────────────────
           echo ""
           echo "--- Loki / Promtail ---"
+
           LOKI_READY=$(curl -sf http://localhost:3100/ready 2>/dev/null | grep -c "ready" || echo "0")
           check "Loki is ready" "$([ "$LOKI_READY" -ge 1 ] && echo true || echo false)"
 
@@ -135,10 +262,11 @@ jobs:
           print('true' if len(streams) > 0 else 'false')" "false")
           check "App logs flowing to Loki" "$HAS_LOGS"
 
-          # 3. Grafana accessible with dashboards
+          # ── 7. Grafana ────────────────────────────────────────────
           echo ""
           echo "--- Grafana ---"
           GF_AUTH="admin:admin"
+
           GF_HEALTH=$(curl -sf http://localhost:3000/api/health 2>/dev/null || echo "{}")
           GF_OK=$(echo "$GF_HEALTH" | json_check "
           import sys,json
@@ -154,9 +282,29 @@ jobs:
           DASH_COUNT=$(echo "$GF_DASH" | json_check "import sys,json; print(len(json.load(sys.stdin)))" "0")
           check "Grafana dashboards loaded ($DASH_COUNT)" "$([ "$DASH_COUNT" -ge 1 ] && echo true || echo false)"
 
-          # 4. Alertmanager running and reachable
+          PROM_DS_ID=$(echo "$GF_DS" | json_check "
+          import sys,json
+          ds=json.load(sys.stdin)
+          prom=[d for d in ds if d.get('type')=='prometheus']
+          print(prom[0]['uid'] if prom else '')" "")
+          if [ -n "$PROM_DS_ID" ]; then
+            GF_PROM_QUERY=$(curl -sf -u "$GF_AUTH" \
+              "http://localhost:3000/api/ds/query" \
+              -H "Content-Type: application/json" \
+              -d '{"queries":[{"refId":"A","datasourceId":1,"expr":"up","instant":true}],"from":"now-5m","to":"now"}' 2>/dev/null || echo "{}")
+            GF_PROM_OK=$(echo "$GF_PROM_QUERY" | json_check "
+          import sys,json
+          data=json.load(sys.stdin)
+          print('true' if 'results' in data else 'false')" "false")
+            check "Grafana→Prometheus proxy query works" "$GF_PROM_OK"
+          else
+            check "Grafana→Prometheus proxy query (skipped - no datasource)" "false"
+          fi
+
+          # ── 8. Alertmanager ───────────────────────────────────────
           echo ""
           echo "--- Alertmanager ---"
+
           AM_STATUS=$(curl -sf http://localhost:9093/api/v2/status 2>/dev/null || echo "{}")
           AM_READY=$(echo "$AM_STATUS" | json_check "
           import sys,json
@@ -171,9 +319,18 @@ jobs:
           print(','.join(r.get('name','') for r in data))" "")
           check "Alertmanager receivers: $RECV_NAMES" "$([ -n "$RECV_NAMES" ] && echo true || echo false)"
 
-          # 5. Prometheus alert rules loaded
+          PROM_AM=$(curl -sf "http://localhost:9090/api/v1/alertmanagers" 2>/dev/null || echo "{}")
+          AM_DISCOVERED=$(echo "$PROM_AM" | json_check "
+          import sys,json
+          data=json.load(sys.stdin)
+          ams=data.get('data',{}).get('activeAlertmanagers',[])
+          print('true' if len(ams) > 0 else 'false')" "false")
+          check "Prometheus discovered Alertmanager" "$AM_DISCOVERED"
+
+          # ── 9. Alert Rules ────────────────────────────────────────
           echo ""
           echo "--- Alert Rules ---"
+
           RULES=$(curl -sf http://localhost:9090/api/v1/rules 2>/dev/null || echo "{}")
           RULE_COUNT=$(echo "$RULES" | json_check "
           import sys,json
@@ -182,6 +339,16 @@ jobs:
           rules=[r for g in groups for r in g.get('rules',[])]
           print(len(rules))" "0")
           check "Prometheus alert rules loaded ($RULE_COUNT)" "$([ "$RULE_COUNT" -ge 1 ] && echo true || echo false)"
+
+          RULE_NAMES=$(echo "$RULES" | json_check "
+          import sys,json
+          data=json.load(sys.stdin)
+          groups=data.get('data',{}).get('groups',[])
+          names=[r['name'] for g in groups for r in g.get('rules',[]) if r.get('type')=='alerting']
+          print(','.join(names))" "")
+          for EXPECTED in ServiceDown HighErrorRate HighLatency RedisDown; do
+            check "Alert rule '$EXPECTED' defined" "$(echo "$RULE_NAMES" | grep -q "$EXPECTED" && echo true || echo false)"
+          done
 
           echo ""
           echo "=== Results: $PASS passed, $FAIL failed ==="
@@ -197,7 +364,7 @@ jobs:
           rm -f "$RESULTS_FILE"
 
           if [ "$FAIL" -gt 0 ]; then
-            echo "::warning::$FAIL monitoring checks failed"
+            echo "::warning::$FAIL infrastructure checks failed"
           fi
 
       - name: Post load test results to PR
@@ -284,7 +451,7 @@ jobs:
                 '',
                 '---',
                 '',
-                '## Observability Stack Verification',
+                '## Infrastructure Stack Verification',
                 '',
                 headline,
                 '',
