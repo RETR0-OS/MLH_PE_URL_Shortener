@@ -393,14 +393,14 @@ class TestCacheWithMockedRedis:
 
         mock = self._make_mock_redis()
         cache_mod._redis_client = mock
-        cache_mod.cache_set("url:1", {"id": 1}, ttl=60)
-        mock.setex.assert_called_once()
+        cache_mod.cache_set("url:1", {"id": 1})
+        mock.set.assert_called_once()
 
     def test_cache_set_redis_error(self):
         import app.utils.cache as cache_mod
 
         mock = self._make_mock_redis()
-        mock.setex.side_effect = Exception("write fail")
+        mock.set.side_effect = Exception("write fail")
         cache_mod._redis_client = mock
         cache_mod.cache_set("url:1", {"id": 1})
         assert cache_mod._circuit_open is True
