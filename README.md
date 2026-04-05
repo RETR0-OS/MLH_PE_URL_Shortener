@@ -7,7 +7,7 @@
 
 A production-grade URL shortener REST API built for the MLH Production Engineering hackathon. It covers all 4 tracks: Reliability, Scalability, Incident Response, and Documentation.
 
-**Who is this for?** Engineers who want a reference implementation of a URL shortener that is built to production standards — with horizontal auto-scaling, a full observability stack, zero-downtime deploys, chaos testing, and 91% test coverage — all running on a single $12/month DigitalOcean droplet.
+**Who is this for?** Engineers who want a reference implementation of a URL shortener that is built to production standards — with horizontal auto-scaling, a full observability stack, zero-downtime deploys, chaos testing, and 91% test coverage — all running on a single DigitalOcean droplet.
 
 **Live**: http://64.225.10.147 | **Docs**: http://64.225.10.147/docs/ | **Dashboard**: http://64.225.10.147:3000
 
@@ -38,6 +38,7 @@ graph TD
   Prometheus -->|"scrape /metrics"| AppR1
   Prometheus -->|"scrape /metrics"| AppR2
   Prometheus --> Alertmanager --> Discord
+  Alertmanager --> Email
   Grafana --> Prometheus
   Grafana --> Loki
 ```

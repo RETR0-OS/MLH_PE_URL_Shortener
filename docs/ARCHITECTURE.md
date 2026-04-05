@@ -12,79 +12,10 @@ Complete overview of the URL Shortener system design, from load balancing throug
 
 ## Architecture Diagram
 
-```
-                            ┌─────────────────────┐
-                            │   Client / User     │
-                            └────────────┬────────┘
-                                         │ HTTP/HTTPS
-                                         ▼
-                     ┌───────────────────────────────────┐
-                     │       Nginx (Port 80/443)         │
-                     │  - Rate limiting (2000 req/s)     │
-                     │  - TLS termination                │
-                     │  - Least-conn load balancing      │
-                     │  - Gzip compression               │
-                     │  - Proxy retry on 502/503         │
-                     └────────────────┬────────────────┘
-                                      │
-                    ┌─────────────────┼─────────────────┐
-                    ▼                 ▼                 ▼
-         ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-         │   App Replica   │ │   App Replica   │ │ App Replica...  │
-         │  (Flask/Guni)   │ │  (Flask/Guni)   │ │  (auto-scaled)  │
-         │  2-4 threads    │ │  2-4 threads    │ │  min 2, max 5   │
-         └────┬────────┬───┘ └────┬────────┬───┘ └────┬────────┬───┘
-              │        │          │        │          │        │
-              ▼        ▼          ▼        ▼          ▼        ▼
-         ┌──────────────────────────────────────────────────────┐
-         │         Shared Cache Layer (Redis 7)                 │
-         │  - LFU eviction (128 MB cap)                         │
-         │  - No TTL (relies on explicit invalidation)          │
-         │  - Circuit breaker (30s fallback to DB)              │
-         │  - Persistence disabled (pure speed)                 │
-         └──────────────────────────────────────────────────────┘
-                              │
-         ┌────────────────────┴────────────────────┐
-         ▼                                          ▼
-    ┌─────────────────────┐              ┌─────────────────────┐
-    │  PostgreSQL 16      │              │   Event Writer      │
-    │  (Source of Truth)  │              │  (Async Thread Pool)│
-    │  - 20-conn pool     │              │  - 2 worker threads │
-    │  - Tuned settings   │              │  - Fire-and-forget  │
-    │  - 9 indexes        │              │  - Doesn't block    │
-    └─────────────────────┘              │    response path    │
-                                         └─────────────────────┘
-
-         Observability Layer (runs in parallel)
-         ─────────────────────────────────────────
-
-    ┌──────────────┐  ┌────────────────┐  ┌──────────────┐
-    │ Prometheus   │  │ Promtail       │  │ Jaeger OTLP  │
-    │ (Metrics)    │  │ (Log Shipper)  │  │ (Traces)     │
-    │ 15s scrape   │  │ Docker socket  │  │ gRPC 4317    │
-    │ 72h retention│  │ → Loki         │  │              │
-    └──────────────┘  └────────────────┘  └──────────────┘
-         │                    │                   │
-         ▼                    ▼                   ▼
-    ┌──────────────────────────────────────────────────────┐
-    │              Loki (Log Aggregation)                   │
-    │  - 72h retention                                      │
-    │  - Full-text indexing by label + stream              │
-    └──────────────────────────────────────────────────────┘
-         │
-         └─────────────────────┬──────────────────────┐
-                               ▼                      ▼
-                           ┌────────────┐       ┌──────────────┐
-                           │  Grafana   │       │ Alertmanager │
-                           │ Dashboards │       │ (Routing)    │
-                           │ 4 GS + 8   │       │ → Email      │
-                           │  panels    │       │ → Discord    │
-                           └────────────┘       └──────────────┘
-```
-
+![Service Architecture](Scalability/assets/URL_Shortner_Architecture.svg)
 ---
 
-## Component Details
+## Component Details 
 
 ### Load Balancer — Nginx
 
