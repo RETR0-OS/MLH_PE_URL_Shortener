@@ -32,14 +32,14 @@ This is the master operational reference for on-call engineers responding to pro
 | Severity | Definition | Examples | Response Time | SLO Impact |
 |----------|-----------|----------|----------------|-----------|
 | **P1 - Critical** | Service completely down or user-facing data loss risk | All replicas down, Postgres unreachable, disk full | Immediate (page on-call) | Violates 99.9% availability target |
-| **P2 - Major** | Service degraded but functioning; increased errors/latency | High error rate (>10%), p95 latency >3s, single replica crash | < 15 minutes | May violate SLO if sustained |
+| **P2 - Major** | Service degraded but functioning; increased errors/latency | High error rate (>5%), p95 latency >500ms, single replica crash | < 15 minutes | May violate SLO if sustained |
 | **P3 - Minor** | Warning condition; service operating below targets | Redis down (circuit breaker active), CPU warning, elevated memory | < 1 hour | Doesn't violate SLO |
 
 **Severity assignment decision tree:**
 - Is the app returning 5xx for all requests? → P1
 - Is `/health/ready` failing? → P1 (or P2 if single replica)
-- Is error rate >10%? → P2
-- Is latency consistently >3s p95? → P2
+- Is error rate >5%? → P2
+- Is latency consistently >500ms p95? → P2
 - Is a non-critical service (Redis, Jaeger) down? → P3
 - Is there a capacity warning (CPU/memory high)? → P3
 
@@ -67,7 +67,7 @@ Determine severity based on **golden signals**:
 Assign severity using the table in section 2.
 
 ### 4. **Diagnose** (5-10 min)
-Consult the **Alert Quick Reference** (section 4) for the specific alert. Jump to the per-alert runbook in `docs/RUNBOOK.md`.
+Consult the **Alert Quick Reference** (section 4) for the specific alert. Jump to the per-alert runbook in section 8 of this playbook.
 
 **Example paths:**
 - `ServiceDown` firing? → [Runbook: ServiceDown](#servicedown)
@@ -88,7 +88,7 @@ Update the status channel (Slack, team chat, email):
 - **At resolution**: "Resolved. Error rate back to <1%. Redis recovered. No data loss."
 
 ### 7. **Postmortem** (after resolution)
-Create a postmortem document in `incident-response/rca/` using the template below.
+Create a postmortem document in `docs/Incident Response/rca/` using the template below.
 
 **When to write postmortem:**
 - All P1 incidents (mandatory)
@@ -131,10 +131,10 @@ Create a postmortem document in `incident-response/rca/` using the template belo
 
 | Alert | Severity | Condition | Fires After | Expected Time to Fire | Runbook |
 |-------|----------|-----------|-------------|----------------------|---------|
-| **ServiceDown** | Critical | `up == 0` | 1 minute | ~70 seconds | [Runbook](../../docs/RUNBOOK.md#servicedown) |
-| **HighErrorRate** | Warning | 5xx rate > 10% | 2 minutes | ~130 seconds | [Runbook](../../docs/RUNBOOK.md#higherrorrate) |
-| **HighLatency** | Warning | p95 > 3 seconds | 2 minutes | ~130 seconds | [Runbook](../../docs/RUNBOOK.md#highlatency) |
-| **RedisDown** | Warning | Redis connection errors > 0 | 1 minute | ~70 seconds | [Runbook](../../docs/RUNBOOK.md#redisdown) |
+| **ServiceDown** | Critical | `up == 0` | 1 minute | ~70 seconds | [Runbook](#servicedown) |
+| **HighErrorRate** | Warning | 5xx rate > 5% | 30 seconds | ~45 seconds | [Runbook](#higherrorrate) |
+| **HighLatency** | Warning | p95 > 500ms | 30 seconds | ~45 seconds | [Runbook](#highlatency) |
+| **RedisDown** | Warning | Redis connection errors > 0 | 1 minute | ~70 seconds | [Runbook](#redisdown) |
 
 **Key insight**: Alerts have a "wait period" (the `for: Xm` duration in `monitoring/prometheus/alerts.yml`). This prevents noise from brief blips. If you see a spike in Grafana but the alert didn't fire, it may have already recovered.
 
@@ -268,7 +268,7 @@ docker compose up -d app  # Uses previous image if still available
 
 ## 8. Runbook Summaries
 
-These are brief summaries of each alert. Full runbooks are in `docs/RUNBOOK.md`.
+These are brief summaries of each alert. Full details are below.
 
 ### ServiceDown
 
@@ -295,7 +295,7 @@ These are brief summaries of each alert. Full runbooks are in `docs/RUNBOOK.md`.
 
 ### HighErrorRate
 
-**Alert fires**: 5xx error rate exceeds 10% for >2 minutes.
+**Alert fires**: 5xx error rate exceeds 5% for >30 seconds.
 
 **Immediate checks**:
 1. Grafana "Error Rate" panel — which endpoints are failing?
@@ -320,7 +320,7 @@ These are brief summaries of each alert. Full runbooks are in `docs/RUNBOOK.md`.
 
 ### HighLatency
 
-**Alert fires**: p95 latency exceeds 3 seconds for >2 minutes.
+**Alert fires**: p95 latency exceeds 500ms for >30 seconds.
 
 **Immediate checks**:
 1. Grafana "Request Duration" panel — is p95 consistently high?
@@ -391,12 +391,12 @@ Grafana "URL Shortener - Golden Signals" dashboard shows four key metrics:
 
 ## 10. Detailed Failure Mode Reference
 
-From `docs/FAILURE_MODES.md`. These describe expected behavior under failure:
+These describe expected behavior under failure:
 
 ### Database Down
 - **Symptom**: `/health/ready` returns 503, all CRUD operations fail
 - **Recovery**: Postgres auto-restarts and connection pool reconnects. App doesn't need restart.
-- **Swarm behavior**: Healthcheck fails, Swarm restarts container after retry policy
+- **Docker behavior**: Healthcheck fails, Docker restarts container per `restart: unless-stopped` policy
 
 ### Redis Down
 - **Symptom**: Connection errors in logs, cache circuit breaker activates
@@ -405,8 +405,8 @@ From `docs/FAILURE_MODES.md`. These describe expected behavior under failure:
 
 ### Container Crash / OOM Kill
 - **Symptom**: `docker compose ps` shows task in Failed/Shutdown state
-- **Impact**: Swarm routing removes dead replica. In-flight requests timeout; Nginx retries on other replicas
-- **Recovery**: Swarm `restart_policy` auto-restarts (5s delay, 5 retries). Recovery time: 5-15s
+- **Impact**: Docker Compose routing removes dead replica. In-flight requests timeout; Nginx retries on other replicas
+- **Recovery**: Docker `restart: unless-stopped` auto-restarts the container. Recovery time: 5-15s
 
 ### Bulk Import Failure
 - **Symptom**: `POST /users/bulk` returns 500
@@ -427,7 +427,7 @@ From `docs/FAILURE_MODES.md`. These describe expected behavior under failure:
 
 ## 11. Memory & Capacity Limits
 
-From `docs/CAPACITY_PLAN.md`. Your hardware has **4 GB RAM** total; ~3.3 GB available for services.
+Your hardware has **4 GB RAM** total; ~3.3 GB available for services.
 
 ### Service Memory Budget
 
@@ -461,10 +461,10 @@ Alert received?
 ├─ ServiceDown (up == 0)
 │  └─ Go to: Runbook "ServiceDown"
 │
-├─ HighErrorRate (5xx > 10%)
+├─ HighErrorRate (5xx > 5%)
 │  └─ Go to: Runbook "HighErrorRate"
 │
-├─ HighLatency (p95 > 3s)
+├─ HighLatency (p95 > 500ms)
 │  └─ Go to: Runbook "HighLatency"
 │
 ├─ RedisDown (redis_connection_errors > 0)
@@ -490,16 +490,12 @@ Keep these docs handy:
 
 | Document | Purpose | Location |
 |----------|---------|----------|
-| **Runbook** | Per-alert detailed steps | `docs/RUNBOOK.md` |
-| **Failure Modes** | Expected behavior under failure | `docs/FAILURE_MODES.md` |
-| **SLOs** | Availability and latency targets | `docs/SLO.md` |
-| **Capacity Plan** | Hardware limits and scaling formulas | `docs/CAPACITY_PLAN.md` |
-| **Troubleshooting** | Common issues and fixes | `docs/TROUBLESHOOTING.md` |
-| **Environment Variables** | Configuration reference | `docs/ENV_VARS.md` |
+| **Incident Playbook** | This document — master operational guide | `docs/Incident Response/runbooks/INCIDENT-PLAYBOOK.md` |
+| **RCA: Redis Failure** | Past incident analysis | `docs/Incident Response/rca/RCA-001-redis-failure.md` |
+| **Postmortem Template** | Incident report structure | `docs/Incident Response/rca/POSTMORTEM-TEMPLATE.md` |
 | **Alert Rules** | Prometheus alert definitions | `monitoring/prometheus/alerts.yml` |
 | **Alertmanager Config** | Email routing and grouping | `monitoring/alertmanager/alertmanager.yml` |
-| **Postmortem Template** | Incident report structure | `incident-response/rca/` (create new files here) |
-| **Previous RCAs** | Past incidents and lessons learned | `incident-response/rca/` |
+| **Design Decisions** | Track 3 rationale and evidence | `docs/Incident Response/INCIDENT_RESPONSE_ENGINEERING_DESIGN_DECISIONS.md` |
 
 ---
 
@@ -512,7 +508,7 @@ Keep these docs handy:
 - [ ] You can access Alertmanager (http://localhost:9093)
 - [ ] You can SSH/access the server hosting Docker
 - [ ] You have docker-compose commands aliased or in your PATH
-- [ ] You've read `docs/RUNBOOK.md` and `docs/FAILURE_MODES.md`
+- [ ] You've read the runbook summaries in section 8 and the failure modes in section 10
 - [ ] You have a way to be notified (email, Slack, phone)
 - [ ] You know how to reach the backup on-call engineer
 - [ ] You have the postmortem template URL bookmarked
@@ -525,7 +521,7 @@ Keep these docs handy:
 
 1. [ ] **Stabilize**: Confirm metrics returned to baseline. Alert cleared in Prometheus.
 2. [ ] **Communicate**: Post final status update. "Resolved at HH:MM UTC. Error rate back to <1%. No data loss."
-3. [ ] **Document**: Create postmortem in `incident-response/rca/` with timeline, root cause, and action items.
+3. [ ] **Document**: Create postmortem in `docs/Incident Response/rca/` with timeline, root cause, and action items.
 4. [ ] **Review**: Share postmortem in team channel within 24 hours.
 5. [ ] **Follow up**: Ensure action items are tracked in your issue tracker (GitHub, Jira, etc.).
 6. [ ] **Prevent**: Close any related PRs that prevent recurrence.
@@ -538,8 +534,8 @@ Keep these numbers in your head:
 
 | Metric | Alert Threshold | SLO Target | Your Hardware Ceiling |
 |--------|-----------------|------------|----------------------|
-| **Error Rate (5xx)** | >10% for 2m | <1% | 20% (saturation) |
-| **Latency p95** | >3s for 2m | <500ms (reads), <1s (writes) | ~3s with 3 replicas |
+| **Error Rate (5xx)** | >5% for 30s | <1% | 20% (saturation) |
+| **Latency p95** | >500ms for 30s | <500ms (reads), <1s (writes) | ~3s with 3 replicas |
 | **Availability** | N/A | 99.9% (10m downtime/week) | ~99.5% if Postgres frequently restarts |
 | **Memory** | N/A | N/A | ~3.3 GB (3 app replicas max) |
 | **CPU** | N/A | <75% | ~180% per vCPU (2 total) with 3 replicas |
@@ -601,9 +597,9 @@ RESOLVED - URL Shortener [AlertName]
 - Escalation: [phone number or contact]
 
 ## Key Docs
-- Full runbook: `docs/RUNBOOK.md`
-- Failure modes: `docs/FAILURE_MODES.md`
-- Incident playbook: `incident-response/runbooks/INCIDENT-PLAYBOOK.md`
+- Incident playbook: `docs/Incident Response/runbooks/INCIDENT-PLAYBOOK.md`
+- RCA archive: `docs/Incident Response/rca/`
+- Design decisions: `docs/Incident Response/INCIDENT_RESPONSE_ENGINEERING_DESIGN_DECISIONS.md`
 
 Questions for the outgoing engineer: [ask here]
 ```

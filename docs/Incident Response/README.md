@@ -38,8 +38,8 @@ Complete incident response infrastructure for the URL Shortener service. This fo
 
 | Requirement | Implementation | Location |
 |-------------|---------------|----------|
-| Structured JSON logging | `pythonjsonlogger` with timestamp, level, message | [`app/logging_config.py`](../app/logging_config.py) |
-| `/metrics` endpoint | Prometheus Flask Exporter (request count, latency histogram, memory) | [`app/__init__.py`](../app/__init__.py) |
+| Structured JSON logging | `pythonjsonlogger` with timestamp, level, message | [`app/logging_config.py`](../../app/logging_config.py) |
+| `/metrics` endpoint | Prometheus Flask Exporter (request count, latency histogram, memory) | [`app/__init__.py`](../../app/__init__.py) |
 | View logs without SSH | Docker JSON log driver + Loki + Grafana Logs panel | `docker compose logs app` |
 
 **Verify:**
@@ -54,22 +54,22 @@ curl -s http://localhost:5000/metrics    # Prometheus metrics
 
 | Requirement | Implementation | Location |
 |-------------|---------------|----------|
-| Service Down alert | `up == 0` for 1m → fires in ~70s | [`monitoring/prometheus/alerts.yml`](../monitoring/prometheus/alerts.yml) |
-| High Error Rate alert | 5xx rate > 10% for 2m → fires in ~130s | Same file |
-| Email notification | Alertmanager SMTP with severity routing | [`monitoring/alertmanager/alertmanager.yml`](../monitoring/alertmanager/alertmanager.yml) |
+| Service Down alert | `up == 0` for 1m → fires in ~70s | [`monitoring/prometheus/alerts.yml`](../../monitoring/prometheus/alerts.yml) |
+| High Error Rate alert | 5xx rate > 5% for 30s → fires in ~45s | Same file |
+| Email notification | Alertmanager SMTP with severity routing | [`monitoring/alertmanager/alertmanager.yml`](../../monitoring/alertmanager/alertmanager.yml) |
 | Fire within 5 minutes | `group_wait: 10s` (warnings), `0s` (critical) | Same file |
-| Chaos testing script | Automated failure injection + alert verification | [`incident-response/chaos/chaos-test.sh`](chaos/chaos-test.sh) |
+| Chaos testing script | Automated failure injection + alert verification | [`chaos-test.sh`](../../scripts/chaos-test.sh) |
 
 **Verify (live demo):**
 ```bash
 # Dry run first
-./incident-response/chaos/chaos-test.sh --service-down --dry-run
+./scripts/chaos-test.sh --service-down --dry-run
 
 # Live demo — stops app, waits for alert, restores, verifies recovery
-./incident-response/chaos/chaos-test.sh --service-down
+./scripts/chaos-test.sh --service-down
 
 # Run all scenarios
-./incident-response/chaos/chaos-test.sh --all
+./scripts/chaos-test.sh --all
 ```
 
 **Alert routing:**
@@ -82,8 +82,8 @@ curl -s http://localhost:5000/metrics    # Prometheus metrics
 
 | Requirement | Implementation | Location |
 |-------------|---------------|----------|
-| Grafana dashboard (4+ metrics) | 8 panels: Uptime, Alerts, Request Rate, Error Rate, Latency, Memory, CPU, Logs | [`monitoring/grafana/dashboards/url-shortener.json`](../monitoring/grafana/dashboards/url-shortener.json) |
-| Runbook | Per-alert mitigation + master incident playbook | [`docs/RUNBOOK.md`](../docs/RUNBOOK.md), [`INCIDENT-PLAYBOOK.md`](runbooks/INCIDENT-PLAYBOOK.md) |
+| Grafana dashboard (4+ metrics) | 8 panels: Uptime, Alerts, Request Rate, Error Rate, Latency, Memory, CPU, Logs | [`monitoring/grafana/dashboards/url-shortener.json`](../../monitoring/grafana/dashboards/url-shortener.json) |
+| Runbook | Per-alert mitigation + master incident playbook | [`INCIDENT-PLAYBOOK.md`](runbooks/INCIDENT-PLAYBOOK.md) |
 | RCA exercise | Redis failure diagnosis using dashboard + logs | [`RCA-001-redis-failure.md`](rca/RCA-001-redis-failure.md) |
 | Postmortem template | Google SRE format with 5 Whys | [`POSTMORTEM-TEMPLATE.md`](rca/POSTMORTEM-TEMPLATE.md) |
 
@@ -119,10 +119,8 @@ curl -s http://localhost:5000/metrics    # Prometheus metrics
 ## Folder Structure
 
 ```
-incident-response/
+docs/Incident Response/
 ├── README.md                        # This file
-├── chaos/
-│   └── chaos-test.sh               # Automated failure injection + alert verification
 ├── rca/
 │   ├── RCA-001-redis-failure.md    # Root Cause Analysis narrative (Gold requirement)
 │   └── POSTMORTEM-TEMPLATE.md      # Reusable incident postmortem template
@@ -130,15 +128,17 @@ incident-response/
 │   └── INCIDENT-PLAYBOOK.md        # Master incident response playbook
 └── screenshots/
     └── .gitkeep                     # Submission screenshots go here
+
+scripts/
+└── chaos-test.sh                    # Automated failure injection + alert verification
 ```
 
 ---
 
 ## Related Documentation
 
-- [Per-Alert Runbook](../docs/RUNBOOK.md) — Step-by-step mitigation for each alert
-- [Failure Modes](../docs/FAILURE_MODES.md) — Expected behavior under failure
-- [SLOs](../docs/SLO.md) — Service level objectives and error budgets
-- [Troubleshooting](../docs/TROUBLESHOOTING.md) — Common issues and fixes
-- [Capacity Plan](../docs/CAPACITY_PLAN.md) — Hardware limits and scaling formulas
-- [Bottleneck Report](../docs/BOTTLENECK_REPORT.md) — Chaos test results and performance data
+- [Incident Playbook](runbooks/INCIDENT-PLAYBOOK.md) — Per-alert runbooks, SLO targets, remediation commands, escalation paths
+- [RCA: Redis Failure](rca/RCA-001-redis-failure.md) — Root cause analysis using dashboard and logs
+- [Postmortem Template](rca/POSTMORTEM-TEMPLATE.md) — Google SRE-style postmortem format
+- [Track 3 Design Decisions](INCIDENT_RESPONSE_ENGINEERING_DESIGN_DECISIONS.md) — All design decisions with rationale and evidence
+- [Track 3 Requirements](../TRACK3_INCIDENT_RESPONSE.md) — Original quest specification

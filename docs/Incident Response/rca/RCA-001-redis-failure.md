@@ -22,7 +22,7 @@ Redis process stopped unexpectedly at 14:32 UTC. Circuit breaker detected the fa
 **Firing Time:** 14:32:03 UTC
 **Detection Latency:** 0.5s from failure injection
 
-The circuit breaker in `app/utils/cache.py` (line 56: `_open_circuit()` call within `get_redis()`) sets a global flag when `get_redis()` fails to establish a connection or ping the server. Prometheus metric `redis_connection_errors_total` incremented, triggering the alert.
+The circuit breaker in `app/utils/cache.py` (line 50: `_open_circuit()` call within `get_redis()`) sets a global flag when `get_redis()` fails to establish a connection or ping the server. Prometheus metric `redis_connection_errors_total` incremented, triggering the alert.
 
 **PromQL Query:**
 ```promql
@@ -163,7 +163,7 @@ All three panels return to normal:
 4. Kernel OOMKiller terminated the Redis process (exit code 137)
 5. The circuit breaker in `app/utils/cache.py` detected the connection failure within 0.5s
 6. Circuit opened, disabling Redis for 30 seconds
-7. All reads fell back to PostgreSQL via the application's cache-aside pattern (lines 71-83 in `cache.py`: `cache_get()` returns `None` when circuit is open)
+7. All reads fell back to PostgreSQL via the application's cache-aside pattern (lines 65-77 in `cache.py`: `cache_get()` returns `None` when circuit is open)
 
 **Why No User Impact:**
 The circuit breaker and fallback were functioning as designed. The application continued serving reads from PostgreSQL. The Nginx `proxy_next_upstream` retry policy was not needed — all three app replicas remained healthy.
@@ -272,7 +272,7 @@ Recovery time: ~15 seconds (container startup + volume remount).
 
 - **Grafana Dashboard:** [URL Shortener - Golden Signals](http://localhost:3000/d/golden-signals)
 - **Prometheus Rules:** `/monitoring/prometheus/alerts.yml`
-- **Circuit Breaker Implementation:** `/app/utils/cache.py` (lines 23-57 for `get_redis()`, lines 65-68 for `_open_circuit()`)
+- **Circuit Breaker Implementation:** `/app/utils/cache.py` (lines 17-51 for `get_redis()`, lines 59-62 for `_open_circuit()`)
 - **Docker Compose:** `/docker-compose.yml` (Redis service definition)
 
 ### Metrics Referenced

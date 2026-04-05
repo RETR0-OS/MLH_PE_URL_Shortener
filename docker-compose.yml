@@ -198,7 +198,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 512M
 
   alertmanager:
     image: prom/alertmanager:latest

@@ -26,7 +26,7 @@
         {
           "expr": "up{job=\"app\"}",
           "legendFormat": "Uptime",
-          "datasource": "Prometheus"
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
         }
       ],
       "options": {
@@ -59,7 +59,7 @@
         {
           "expr": "count(ALERTS{alertstate=\"firing\"}) OR vector(0)",
           "legendFormat": "Firing",
-          "datasource": "Prometheus"
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
         }
       ],
       "options": {
@@ -88,9 +88,9 @@
       "gridPos": { "h": 4, "w": 16, "x": 8, "y": 0 },
       "targets": [
         {
-          "expr": "sum(rate(flask_http_request_total[1m])) by (method)",
+          "expr": "sum(rate(flask_http_request_total[5m])) by (method)",
           "legendFormat": "{{ method }}",
-          "datasource": "Prometheus"
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
         }
       ]
     },
@@ -100,9 +100,9 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
       "targets": [
         {
-          "expr": "sum(rate(flask_http_request_total{status=~\"5..\"}[2m])) / sum(rate(flask_http_request_total[2m])) * 100",
+          "expr": "sum(rate(flask_http_request_total{status=~\"5..\"}[5m])) / sum(rate(flask_http_request_total[5m])) * 100",
           "legendFormat": "5xx %",
-          "datasource": "Prometheus"
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
         }
       ]
     },
@@ -114,17 +114,17 @@
         {
           "expr": "histogram_quantile(0.50, sum(rate(flask_http_request_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "p50",
-          "datasource": "Prometheus"
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
         },
         {
           "expr": "histogram_quantile(0.95, sum(rate(flask_http_request_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "p95",
-          "datasource": "Prometheus"
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
         },
         {
           "expr": "histogram_quantile(0.99, sum(rate(flask_http_request_duration_seconds_bucket[5m])) by (le))",
           "legendFormat": "p99",
-          "datasource": "Prometheus"
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
         }
       ]
     },
@@ -136,7 +136,7 @@
         {
           "expr": "process_resident_memory_bytes",
           "legendFormat": "{{ instance }}",
-          "datasource": "Prometheus"
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
         }
       ]
     },
@@ -146,9 +146,9 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
       "targets": [
         {
-          "expr": "rate(process_cpu_seconds_total{job=\"app\"}[1m]) * 100",
+          "expr": "rate(process_cpu_seconds_total{job=\"app\"}[5m]) * 100",
           "legendFormat": "CPU %",
-          "datasource": "Prometheus"
+          "datasource": {"type": "prometheus", "uid": "prometheus"}
         }
       ],
       "fieldConfig": {
@@ -166,7 +166,7 @@
       "targets": [
         {
           "expr": "{job=\"app\"}",
-          "datasource": "Loki"
+          "datasource": {"type": "loki", "uid": "loki"}
         }
       ],
       "options": {

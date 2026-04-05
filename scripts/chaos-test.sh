@@ -20,8 +20,8 @@
 #                  Expect alert in ~70–80 s after Redis stops.
 #
 # USAGE:
-#   ./incident-response/chaos/chaos-test.sh [--service-down | --redis-down | --all] [--dry-run]
-#   ./incident-response/chaos/chaos-test.sh --help
+#   ./scripts/chaos-test.sh [--service-down | --redis-down | --all] [--dry-run]
+#   ./scripts/chaos-test.sh --help
 #
 # REQUIREMENTS:
 #   - Run from the project root directory (where docker-compose.yml lives)
@@ -146,7 +146,7 @@ usage() {
 ${BOLD}chaos-test.sh${RESET} — MLH PE Incident Response Chaos Tester
 
 ${BOLD}USAGE${RESET}
-  ./incident-response/chaos/chaos-test.sh <scenario> [--dry-run]
+  ./docs/Incident\ Response/chaos/chaos-test.sh <scenario> [--dry-run]
 
 ${BOLD}SCENARIOS${RESET}
   --service-down   Stop the app container; wait for ServiceDown alert to fire
@@ -167,8 +167,8 @@ ${BOLD}EXPECTED ALERT TIMING${RESET}
 
 ${BOLD}EXAMPLES${RESET}
   # Run from project root
-  bash incident-response/chaos/chaos-test.sh --service-down
-  bash incident-response/chaos/chaos-test.sh --all --dry-run
+  bash scripts/chaos-test.sh --service-down
+  bash scripts/chaos-test.sh --all --dry-run
 
 EOF
 }
