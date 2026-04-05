@@ -19,6 +19,60 @@ graph TD
   Grafana --> Prometheus
   Grafana --> Loki
 ```
+## CI/CD Pipeline — DigitalOcean Deployment
+
+```mermaid
+flowchart TD
+    A([Push to main / PR to main or dev]) --> B{Event type?}
+
+    B -->|PR to main or dev| C[🔍 Lint Job\nRuff check + format]
+    B -->|Push to main| C
+
+    C -->|❌ Lint fails| FAIL1([❌ Pipeline blocked])
+    C -->|✅ Lint passes| D{Push to main?}
+
+    D -->|No — PR only| END_PR([✅ PR checks pass])
+    D -->|Yes| E[🐳 Build Job\nDocker Buildx]
+
+    E --> E1[Lowercase image name]
+    E1 --> E2[Log in to GHCR]
+    E2 --> E3[Generate Docker meta\nsha / branch / latest tags]
+    E3 --> E4[Build & push image\nto ghcr.io with GHA cache]
+
+    E4 --> F[🛡️ Scan Job\nTrivy vulnerability scanner]
+    F --> F1[Scan for CRITICAL + HIGH CVEs]
+    F1 --> F2[Upload SARIF to GitHub\nCode Scanning]
+
+    E4 --> G[🚀 Deploy Job\nDigitalOcean Droplet]
+    G --> G1[Install sshpass]
+    G1 --> G2[SSH into Droplet\nvia DROPLET_IP / USER / PASS]
+    G2 --> G3[git stash → checkout main\n→ git pull origin main]
+    G3 --> G4[docker compose up -d\n--build --remove-orphans]
+    G4 --> G5{Health check loop\n30 retries / 1s}
+
+    G5 -->|curl /health ✅| G6[Print container status\ndocker compose ps]
+    G5 -->|All 30 retries fail| FAIL2[docker compose logs\ntail=20 app]
+    FAIL2 --> FAIL3([❌ Deploy failed])
+
+    G6 --> SUCCESS([✅ Deploy complete])
+    F2 --> SUCCESS
+
+    style A fill:#4f46e5,color:#fff
+    style SUCCESS fill:#16a34a,color:#fff
+    style FAIL1 fill:#dc2626,color:#fff
+    style FAIL2 fill:#dc2626,color:#fff
+    style FAIL3 fill:#dc2626,color:#fff
+    style END_PR fill:#0891b2,color:#fff
+```
+
+## Workflows
+
+| File | Trigger | Jobs |
+|---|---|---|
+| `.github/workflows/ci.yml` | push `main`, PRs to `main`/`dev` | lint → build → scan |
+| `.github/workflows/deploy.yml` | push `main` only | SSH deploy to droplet |
+
+> **Note:** Both workflows fire in parallel on push to `main` — the deploy does not wait for the vulnerability scan to complete.
 
 ## Quick Start (Local Development)
 
