@@ -94,7 +94,9 @@ services:
     command: >
       redis-server
       --maxmemory 128mb
-      --maxmemory-policy allkeys-lru
+      --maxmemory-policy allkeys-lfu
+      --lfu-decay-time 1
+      --lfu-log-factor 10
       --save ""
       --appendonly no
     ports:

@@ -77,13 +77,13 @@ def cache_get(key):
     return None
 
 
-def cache_set(key, value, ttl=300):
-    """Set a value in Redis. Fails silently on Redis errors."""
+def cache_set(key, value):
+    """Set a value in Redis with no TTL, relying on LFU eviction. Fails silently on Redis errors."""
     r = get_redis()
     if r is None:
         return
     try:
-        r.setex(key, ttl, json.dumps(value))
+        r.set(key, json.dumps(value))
     except Exception:
         logger.warning("Redis SET failed for key=%s", key)
         _open_circuit()
