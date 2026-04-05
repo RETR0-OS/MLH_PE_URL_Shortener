@@ -1,7 +1,6 @@
-import datetime
-
 from flask import Blueprint, jsonify, request
 
+from app.database import utcnow
 from app.models.event import Event
 from app.models.url import Url
 from app.models.user import User
@@ -30,8 +29,7 @@ def list_events():
         query = query.where(Event.event_type == event_type)
 
     per_page = request.args.get("per_page", 100, type=int)
-    if cursor is not None:
-        query = query.limit(per_page)
+    query = query.limit(per_page)
 
     return jsonify([e.to_dict() for e in query])
 
@@ -79,7 +77,7 @@ def update_event(event_id):
             return jsonify(error="User not found"), 404
         event.user_id = data["user_id"]
 
-    event.timestamp = datetime.datetime.now()
+    event.timestamp = utcnow()
     event.save()
 
     return jsonify(event.to_dict())
@@ -119,7 +117,7 @@ def create_event():
         url=url_id,
         user=user_id,
         event_type=event_type.strip(),
-        timestamp=datetime.datetime.now(),
+        timestamp=utcnow(),
         details=details,
     )
 

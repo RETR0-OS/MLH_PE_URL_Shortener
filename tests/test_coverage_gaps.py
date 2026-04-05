@@ -59,14 +59,14 @@ class TestInternalServerError:
 # ---------------------------------------------------------------------------
 class TestDockerSecretRead:
     def test_read_secret_from_file(self):
-        from app.database import _read_secret
+        from app.utils.secrets import read_secret
 
-        with patch("app.database.Path") as MockPath:
+        with patch("app.utils.secrets.Path") as MockPath:
             mock_instance = MagicMock()
             mock_instance.exists.return_value = True
             mock_instance.read_text.return_value = "  my_secret_value  \n"
             MockPath.return_value = mock_instance
-            result = _read_secret("test_secret", "default")
+            result = read_secret("test_secret", "default")
             assert result == "my_secret_value"
 
 
@@ -431,19 +431,25 @@ class TestCacheWithMockedRedis:
         import app.utils.cache as cache_mod
 
         mock = self._make_mock_redis()
+        mock_pipe = MagicMock()
+        mock.pipeline.return_value = mock_pipe
         mock.scan.return_value = (0, ["urls:user:1", "urls:user:2"])
         cache_mod._redis_client = mock
         cache_mod.cache_delete_pattern("urls:user:*")
-        mock.delete.assert_called_once_with("urls:user:1", "urls:user:2")
+        assert mock_pipe.delete.call_count == 2
+        mock_pipe.execute.assert_called_once()
 
     def test_cache_delete_pattern_no_keys(self):
         import app.utils.cache as cache_mod
 
         mock = self._make_mock_redis()
+        mock_pipe = MagicMock()
+        mock.pipeline.return_value = mock_pipe
         mock.scan.return_value = (0, [])
         cache_mod._redis_client = mock
         cache_mod.cache_delete_pattern("urls:user:*")
-        mock.delete.assert_not_called()
+        mock_pipe.delete.assert_not_called()
+        mock_pipe.execute.assert_called_once()
 
     def test_cache_delete_pattern_redis_error(self):
         import app.utils.cache as cache_mod
@@ -455,14 +461,14 @@ class TestCacheWithMockedRedis:
         assert cache_mod._circuit_open is True
 
     def test_cache_read_secret_from_file(self):
-        import app.utils.cache as cache_mod
+        import app.utils.secrets as secrets_mod
 
-        with patch.object(cache_mod, "Path") as MockPath:
+        with patch.object(secrets_mod, "Path") as MockPath:
             mock_instance = MagicMock()
             mock_instance.exists.return_value = True
             mock_instance.read_text.return_value = "  secret_val  \n"
             MockPath.return_value = mock_instance
-            result = cache_mod._read_secret("redis_password", "default")
+            result = secrets_mod.read_secret("redis_password", "default")
             assert result == "secret_val"
 
     def test_url_get_cache_hit(self, client):

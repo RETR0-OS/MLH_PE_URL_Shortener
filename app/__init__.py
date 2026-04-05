@@ -18,10 +18,12 @@ def _create_indexes():
         "CREATE INDEX IF NOT EXISTS idx_urls_user_id ON urls (user_id)",
         "CREATE INDEX IF NOT EXISTS idx_urls_short_code ON urls (short_code)",
         "CREATE INDEX IF NOT EXISTS idx_urls_is_active ON urls (is_active)",
+        "CREATE INDEX IF NOT EXISTS idx_urls_user_id_is_active ON urls (user_id, is_active)",
         "CREATE INDEX IF NOT EXISTS idx_events_url_id ON events (url_id)",
         "CREATE INDEX IF NOT EXISTS idx_events_user_id ON events (user_id)",
         "CREATE INDEX IF NOT EXISTS idx_events_event_type ON events (event_type)",
         "CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events (timestamp DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_events_url_id_event_type ON events (url_id, event_type)",
     ]
     for stmt in indexes:
         try:

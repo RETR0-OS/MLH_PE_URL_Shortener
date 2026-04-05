@@ -82,8 +82,8 @@ def bulk_load_users():
 
     count = len(rows)
     if rows:
-        with db.atomic():
-            for i in range(0, len(rows), 100):
+        for i in range(0, len(rows), 100):
+            with db.atomic():
                 (
                     User.insert_many(rows[i : i + 100])
                     .on_conflict_ignore()
