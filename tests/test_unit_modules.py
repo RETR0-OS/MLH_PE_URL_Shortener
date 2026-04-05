@@ -83,7 +83,7 @@ class TestMiddleware:
         resp = client.get("/health")
         rid = resp.headers["X-Request-ID"]
         parsed = uuid.UUID(rid)
-        assert str(parsed) == rid
+        assert parsed.hex == rid.replace("-", "")
 
     def test_checkpoint_outside_request_context_is_noop(self, app):
         from app.middleware import checkpoint
