@@ -270,6 +270,35 @@ document.getElementById("create-user-form")?.addEventListener("submit", async (e
   }
 });
 
+// Bulk CSV import toggle
+document.getElementById("toggle-bulk-import")?.addEventListener("click", () => {
+  const form = document.getElementById("bulk-import-form");
+  if (form) form.style.display = form.style.display === "none" ? "flex" : "none";
+});
+
+// Bulk CSV import submit
+document.getElementById("bulk-import-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const fileInput = e.target.querySelector('input[name="file"]');
+  if (!fileInput.files.length) return;
+  const formData = new FormData();
+  formData.append("file", fileInput.files[0]);
+  try {
+    const headers = {};
+    const key = localStorage.getItem("x-api-key");
+    if (key) headers["X-API-Key"] = key;
+    const res = await fetch("/users/bulk", { method: "POST", body: formData, headers });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Import failed");
+    showToast(`Imported ${data.imported ?? data.count ?? 0} users.`, "success");
+    e.target.reset();
+    e.target.style.display = "none";
+    await refreshStats();
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+});
+
 document.querySelectorAll("#users-table th[data-col]").forEach((th) => {
   th.addEventListener("click", () => {
     const col = th.dataset.col;

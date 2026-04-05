@@ -6,9 +6,26 @@
 
 export class ApiError extends Error {
   constructor(status, statusText, body) {
-    const message =
-      body?.message || body?.error || body?.detail || statusText || "Unknown error";
-    super(`HTTP ${status}: ${message}`);
+    let message =
+      body?.message || body?.error || body?.detail || "";
+
+    // Append field-level validation details if present
+    // Backend returns: {"error": "Validation failed", "details": {"field": "msg"}}
+    // OR just: {"field": "msg", "field2": "msg2"}
+    const details = body?.details;
+    if (details && typeof details === "object") {
+      const fields = Object.entries(details).map(([k, v]) => `${k}: ${v}`).join("; ");
+      message = message ? `${message} (${fields})` : fields;
+    } else if (!message && body && typeof body === "object") {
+      // Fallback: try to extract field-level errors from top-level keys
+      const fields = Object.entries(body)
+        .filter(([k]) => !["error", "message", "detail", "details"].includes(k))
+        .map(([k, v]) => `${k}: ${v}`)
+        .join("; ");
+      if (fields) message = fields;
+    }
+
+    super(`HTTP ${status}: ${message || statusText || "Unknown error"}`);
     this.status = status;
     this.body = body;
     this.name = "ApiError";

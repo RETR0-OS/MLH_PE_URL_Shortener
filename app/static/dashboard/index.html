@@ -120,6 +120,18 @@
           <button type="submit" class="btn-primary">Create</button>
         </form>
 
+        <!-- Bulk CSV import (toggle) -->
+        <div style="margin:6px 0 10px;">
+          <button id="toggle-bulk-import" class="btn-primary" style="font-size:11px;padding:3px 10px;">
+            Bulk CSV Import
+          </button>
+          <form id="bulk-import-form" class="inline-form" style="display:none;margin-top:6px;" aria-label="Bulk import users from CSV">
+            <input type="file" name="file" accept=".csv" required aria-label="CSV file" style="flex:1;font-size:12px;" />
+            <button type="submit" class="btn-primary">Import</button>
+            <span class="muted" style="font-size:10px;margin-left:4px;">CSV columns: id, username, email, created_at</span>
+          </form>
+        </div>
+
         <!-- Active user chip (hidden when no filter) -->
         <span id="active-user-chip" class="active-chip" style="display:none;" aria-live="polite"></span>
 
