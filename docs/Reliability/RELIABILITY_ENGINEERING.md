@@ -104,6 +104,7 @@ Every error returns a JSON object — Python stack traces never reach the client
 | Method not allowed | `405` | `{"error": "Method not allowed"}` |
 | Missing/bad JSON body | `400` | `{"error": "JSON body required"}` |
 | Validation failure | `400` | `{"field": "error message"}` per field |
+| Invalid URL format | `400` | `{"original_url": "original_url must be a valid URL starting with http:// or https://"}` |
 | Duplicate username or email | `409` | `{"error": "..."}` |
 | Unauthorized (API key) | `401` | `{"error": "Unauthorized"}` |
 | DB unreachable | `503` | `{"status": "unavailable"}` |
@@ -255,6 +256,12 @@ Deploys never take the service offline. Docker Compose is configured with `order
 5. Repeats for the second replica
 
 At no point are zero replicas running. Nginx routes traffic to whichever replicas are healthy. Users experience zero downtime during the entire rollout. If the new image fails to start or the health check never passes, the old containers keep serving — the deploy workflow exits non-zero and alerts the team via GitHub Actions.
+
+---
+
+## Post-Testing Improvements
+
+**URL Format Validation (added post-testing):** `original_url` is now validated to require a valid `http://` or `https://` scheme with a non-empty host, using `urllib.parse.urlparse`. Discovered during dashboard demo testing where `https:/github.com` (single slash) was accepted — now returns 400 with `{"original_url": "original_url must be a valid URL starting with http:// or https://"}`.
 
 ---
 
