@@ -134,6 +134,7 @@ class TestDeleteUser:
     def test_users_urls_deleted_on_cascade(self, client):
         user = _make_user(client)
         url = _make_url(client, user["id"])
+        time.sleep(0.5)
         client.delete(f"/users/{user['id']}")
         resp = client.get(f"/urls/{url['id']}")
         assert resp.status_code == 404
