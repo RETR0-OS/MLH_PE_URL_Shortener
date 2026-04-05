@@ -1,3 +1,9 @@
+---
+layout: default
+title: Scalability Engineering
+permalink: /scalability/
+---
+
 # Scalability Track Submission
 
 ## Application Overview

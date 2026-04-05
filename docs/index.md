@@ -154,7 +154,7 @@ title: Home
     <div class="card-desc">CI/CD pipeline, 91% test coverage, chaos engineering, container restart policies, and failure modes.</div>
     <div class="card-arrow">Read docs →</div>
   </a>
-  <a class="card" href="{{ site.baseurl }}/TRACK2_SCALABILITY_ENGINEERING">
+  <a class="card" href="{{ site.baseurl }}/scalability/">
     <div class="card-icon">🚀</div>
     <div class="card-title">Scalability Engineering</div>
     <div class="card-desc">500 VU k6 load tests, Nginx load balancing, Redis caching, horizontal scaling, and bottleneck analysis.</div>
@@ -166,7 +166,7 @@ title: Home
     <div class="card-desc">Prometheus alerting, Grafana dashboards, Loki log aggregation, Jaeger tracing, and RCA documentation.</div>
     <div class="card-arrow">Read docs →</div>
   </a>
-  <a class="card" href="{{ site.baseurl }}/TRACK4_DOCUMENTATION">
+  <a class="card" href="{{ site.baseurl }}/api">
     <div class="card-icon">📜</div>
     <div class="card-title">Documentation</div>
     <div class="card-desc">Architecture diagrams, API docs, deploy guide, runbook, decision log, and capacity plan.</div>
@@ -184,11 +184,11 @@ title: Home
     <div class="ref-name">Error Handling</div>
     <div class="ref-desc">All error codes and response shapes</div>
   </a>
-  <a class="ref-item" href="{{ site.baseurl }}/TRACK4_DOCUMENTATION#decision-log">
+  <a class="ref-item" href="{{ site.baseurl }}/scalability/#architectural-decisions">
     <div class="ref-name">Decision Log</div>
     <div class="ref-desc">Why we chose Redis, Nginx, Gunicorn</div>
   </a>
-  <a class="ref-item" href="{{ site.baseurl }}/TRACK2_SCALABILITY_ENGINEERING#bottleneck-analysis">
+  <a class="ref-item" href="{{ site.baseurl }}/scalability/#architectural-decisions">
     <div class="ref-name">Bottleneck Report</div>
     <div class="ref-desc">What was slow and how we fixed it</div>
   </a>
