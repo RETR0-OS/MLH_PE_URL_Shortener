@@ -1,0 +1,56 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Deploy to droplet
+        env:
+          DROPLET_IP: ${{ secrets.DROPLET_IP }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+          DROPLET_PASS: ${{ secrets.DROPLET_PASS }}
+        run: |
+          sshpass -p "$DROPLET_PASS" ssh -o StrictHostKeyChecking=no "${DROPLET_USER}@${DROPLET_IP}" bash -s <<'REMOTE'
+            set -euo pipefail
+            cd /root/MLH_PE_URL_Shortener
+
+            echo "--- pulling latest main"
+            git stash --quiet 2>/dev/null || true
+            git checkout main
+            git pull origin main
+            git stash pop --quiet 2>/dev/null || true
+
+            echo "--- rebuilding containers"
+            docker compose up -d --build --remove-orphans
+
+            echo "--- waiting for health check"
+            for i in $(seq 1 30); do
+              if curl -sf http://localhost/health > /dev/null 2>&1; then
+                echo "--- healthy after ${i}s"
+                break
+              fi
+              sleep 1
+            done
+
+            if ! curl -sf http://localhost/health > /dev/null 2>&1; then
+              echo "!!! health check failed after 30s"
+              docker compose logs --tail=20 app
+              exit 1
+            fi
+
+            echo "--- deploy complete"
+            docker compose ps --format "table {{.Name}}\t{{.Status}}"
+          REMOTE
