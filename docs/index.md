@@ -135,7 +135,7 @@ title: Home
   <p class="hero-sub">A production-grade URL shortening service built with reliability, scalability, and observability from day one.</p>
   <div class="hero-btns">
     <a class="btn btn-green" href="https://github.com/RETR0-OS/MLH_PE_URL_Shortener" target="_blank">⭐ GitHub Repo</a>
-    <a class="btn btn-dark" href="{{ site.baseurl }}/api">📄 API Docs</a>
+    <a class="btn btn-dark" href="http://64.225.10.147/docs/" target="_blank">📄 API Docs</a>
   </div>
 </div>
 
@@ -185,7 +185,7 @@ title: Home
     <div class="ref-name">Bottleneck Report</div>
     <div class="ref-desc">What was slow and how we fixed it</div>
   </a>
-  <a class="ref-item" href="{{ site.baseurl }}/api">
+  <a class="ref-item" href="http://64.225.10.147/docs/" target="_blank">
     <div class="ref-name">API Docs</div>
     <div class="ref-desc">Interactive Swagger UI</div>
   </a>
