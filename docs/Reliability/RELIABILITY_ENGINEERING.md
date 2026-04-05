@@ -243,3 +243,39 @@ The full CI/CD pipeline works as follows:
 4. **Concurrency lock** — only one deploy runs at a time, preventing race conditions from rapid merges
 
 Due to budget constraints, we run a single DigitalOcean droplet for production — there is no separate dev or staging VM. To compensate, the CI pipeline acts as our staging gate: every PR must pass the full test suite, load tests, and lint checks against a real Postgres + Redis stack inside GitHub Actions before code ever reaches the production server. This means broken code is caught before it touches the droplet, not after.
+
+### Zero-Downtime Deploys
+
+Deploys never take the service offline. Docker Compose is configured with `order: start-first` and 2 replicas behind Nginx:
+
+1. `docker compose up -d --build` starts building the new image
+2. Docker spins up a **new** replica with the updated code
+3. The new replica passes its health check (`/health` → 200)
+4. Docker stops the **old** replica
+5. Repeats for the second replica
+
+At no point are zero replicas running. Nginx routes traffic to whichever replicas are healthy. Users experience zero downtime during the entire rollout. If the new image fails to start or the health check never passes, the old containers keep serving — the deploy workflow exits non-zero and alerts the team via GitHub Actions.
+
+---
+
+## 🏗️ Architecture Decisions & Trade-offs
+
+| Decision | What we chose | What we gave up | Why it's worth it |
+|---|---|---|---|
+| **Single droplet, no staging** | One DigitalOcean VM runs production | No isolated staging/dev environment to catch env-specific bugs | Budget constraint — compensated by running full integration + load tests against real Postgres/Redis in CI; broken code is caught before it touches prod |
+| **SSH-based deploy over K8s/ECS** | `deploy.yml` SSHs in, pulls, rebuilds | No container orchestration, no blue-green at the infra level | Simple, fast, zero vendor lock-in — `start-first` rolling deploy gives us zero-downtime anyway; appropriate for a single-server setup |
+| **Docker Compose over Kubernetes** | Single `docker-compose.yml` defines the full stack | No auto-scaling across nodes, no service mesh, no pod-level health routing | Massively simpler to operate, debug, and reason about; horizontal scaling handled by the autoscaler script + replica count; right-sized for current traffic |
+| **Redis as cache, not primary store** | Redis caches hot reads; Postgres is the source of truth | Cache misses hit Postgres directly (slightly higher latency) | Circuit breaker means Redis failure causes zero 5xx errors — reads fall through to Postgres transparently; no data loss risk from cache eviction |
+| **Gunicorn sync workers over async** | Sync workers behind Nginx | No async I/O (WebSockets, long-polling not native) | URL shortener is request/response — sync workers are simpler to debug, profile, and reason about; Nginx handles connection pooling and buffering |
+| **Coverage floor (70%) over 100% target** | CI enforces `--cov-fail-under=70`; actual is 91% | Not chasing 100% coverage | Diminishing returns past ~90%; the gap tests cover the branches that matter (error handlers, edge cases); time spent on the last 9% is better spent on chaos tests and load tests |
+| **PR checklist over automated enforcement** | Human-verified checklist on every PR | Relies on contributors checking boxes honestly | Encourages ownership and review culture; automated gates (CI checks) still block merge if tests/lint fail regardless of what boxes are checked |
+| **Alertmanager over PagerDuty/Opsgenie** | Self-hosted Alertmanager → Discord + email | No on-call rotation, no escalation policies, no phone alerts | Free, no vendor dependency, under 90s alert latency; appropriate for a hackathon project without a formal on-call team |
+
+### Strengths of this architecture
+
+- **Reliability without complexity** — 2 replicas, restart policies, circuit breakers, and chaos tests give us production-grade resilience from a single `docker-compose.yml` with no Kubernetes overhead
+- **CI as the staging environment** — every PR runs 174 tests, 500-VU load tests, and lint checks against real service containers; code is battle-tested before it ever touches the server
+- **Zero-downtime by default** — `start-first` rolling deploys + Nginx health routing mean users never see a deploy in progress
+- **Full observability stack** — Prometheus metrics, Grafana dashboards, Loki logs, Jaeger traces, and Alertmanager notifications give us complete visibility without any third-party SaaS
+- **Graceful degradation** — Redis goes down and the app keeps serving from Postgres with zero errors; a replica dies and Nginx routes around it; bad input returns clean JSON instead of stack traces
+- **Everything is automated** — CI gates block bad merges, deploys run on merge with health checks, chaos tests run inject → alert → restore → verify with no manual steps, and alerts fire within 90 seconds of a failure
