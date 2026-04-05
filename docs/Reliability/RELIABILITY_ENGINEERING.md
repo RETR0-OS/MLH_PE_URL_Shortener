@@ -220,6 +220,7 @@ The rubric asked for a health endpoint, some tests, and a restart policy. We tre
 | What | One line |
 |---|---|
 | **CD pipeline — auto-deploy on merge** | [`deploy.yml`](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/blob/dev/.github/workflows/deploy.yml) SSHs into the DigitalOcean droplet, rebuilds containers, and health-checks the app — no manual deploy steps |
+| **PR checklist template** | Every PR must complete a [structured checklist](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/blob/dev/.github/pull_request_template.md) covering code quality, testing, CI gates, production impact, and docs before merge — nothing ships unchecked |
 | **k6 in CI on every PR** | [`load-tests.yml`](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/blob/dev/.github/workflows/load-tests.yml) fires 500 VUs at the full stack before any merge; results posted as a bot comment |
 | **Automated chaos script** | [`chaos-test.sh`](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/blob/dev/incident-response/chaos/chaos-test.sh) runs inject → alert → restore → verify with no manual steps; exits non-zero if anything times out |
 | **Nginx load-balancing across 2 live replicas** | One container dying drops zero requests — Nginx routes around it while Docker restarts the failed one |
