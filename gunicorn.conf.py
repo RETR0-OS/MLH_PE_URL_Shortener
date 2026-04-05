@@ -76,6 +76,7 @@ def post_fork(server, worker):
     """Re-initialize DB pool in child to avoid sharing connections across fork."""
     server.log.info("Worker spawned (pid=%s), reinitializing DB pool", worker.pid)
     from app.database import db, _create_database
+
     if not db.is_closed():
         db.close()
     db.initialize(_create_database())

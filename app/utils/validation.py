@@ -1,4 +1,5 @@
 import re
+from urllib.parse import urlparse
 
 EMAIL_RE = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 
@@ -55,6 +56,12 @@ def validate_url_create(data):
         errors["original_url"] = "original_url is required"
     elif not isinstance(data["original_url"], str) or not data["original_url"].strip():
         errors["original_url"] = "original_url must be a non-empty string"
+    else:
+        parsed = urlparse(data["original_url"].strip())
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            errors["original_url"] = (
+                "original_url must be a valid URL starting with http:// or https://"
+            )
 
     if "title" not in data:
         errors["title"] = "title is required"
