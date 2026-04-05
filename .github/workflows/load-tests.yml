@@ -264,7 +264,10 @@ jobs:
 
           HAS_LOGS="false"
           if [ "$LOKI_OK" = "true" ]; then
-            for attempt in $(seq 1 6); do
+            curl -sf http://localhost:80/health > /dev/null 2>&1 || true
+            curl -sf http://localhost:80/health > /dev/null 2>&1 || true
+            curl -sf http://localhost:80/health > /dev/null 2>&1 || true
+            for attempt in $(seq 1 12); do
               LOKI_LOGS=$(curl -sf "http://localhost:3100/loki/api/v1/query?query=%7Bjob%3D%22app%22%7D&limit=5" 2>/dev/null || echo "{}")
               HAS_LOGS=$(echo "$LOKI_LOGS" | json_check "
           import sys,json
@@ -272,7 +275,7 @@ jobs:
           streams=data.get('data',{}).get('result',[])
           print('true' if len(streams) > 0 else 'false')" "false")
               if [ "$HAS_LOGS" = "true" ]; then break; fi
-              echo "  Waiting for logs in Loki (attempt $attempt/6)..."
+              echo "  Waiting for logs in Loki (attempt $attempt/12)..."
               sleep 5
             done
           fi
