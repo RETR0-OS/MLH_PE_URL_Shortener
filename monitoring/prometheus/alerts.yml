@@ -12,24 +12,24 @@ groups:
 
       - alert: HighErrorRate
         expr: >
-          (rate(flask_http_request_total{status=~"5.."}[2m])
-          / rate(flask_http_request_total[2m])) > 0.1
-        for: 2m
+          (rate(flask_http_request_total{status=~"5.."}[1m])
+          / rate(flask_http_request_total[1m])) > 0.05
+        for: 30s
         labels:
           severity: warning
         annotations:
           summary: "High 5xx error rate on {{ $labels.instance }}"
-          description: "Error rate is above 10% for the last 2 minutes."
+          description: "Error rate is above 5% for the last 30 seconds. Current value: {{ $value | printf \"%.1f%%\" }}"
 
       - alert: HighLatency
         expr: >
-          histogram_quantile(0.95, rate(flask_http_request_duration_seconds_bucket[5m])) > 3
-        for: 2m
+          histogram_quantile(0.95, rate(flask_http_request_duration_seconds_bucket[1m])) > 0.5
+        for: 30s
         labels:
           severity: warning
         annotations:
           summary: "High p95 latency on {{ $labels.instance }}"
-          description: "95th percentile latency exceeds 3 seconds."
+          description: "95th percentile latency exceeds 500ms. Current value: {{ $value | printf \"%.2fs\" }}"
 
       - alert: RedisDown
         expr: increase(redis_connection_errors_total[1m]) > 0
@@ -39,3 +39,32 @@ groups:
         annotations:
           summary: "Redis connection errors detected"
           description: "Redis connection errors have been increasing for 1 minute."
+
+  - name: scaling_alerts
+    rules:
+      - alert: HighReplicaCount
+        expr: count(up{job="app"}) > 3
+        for: 10s
+        labels:
+          severity: warning
+        annotations:
+          summary: "App has scaled beyond baseline"
+          description: "Running {{ $value }} replicas (baseline is 2). Autoscaler has kicked in due to high load."
+
+      - alert: HighRequestRate
+        expr: sum(rate(flask_http_request_total[1m])) > 400
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusually high request rate"
+          description: "Request rate is {{ $value | printf \"%.0f\" }} req/s, which exceeds the 200 req/s threshold."
+
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes{job="app"} > 256 * 1024 * 1024
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Instance {{ $labels.instance }} is using {{ $value | humanize }}B of RSS memory (threshold: 256MB)."

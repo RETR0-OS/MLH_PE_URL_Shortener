@@ -1,0 +1,173 @@
+name: Load Tests
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-docker-${{ hashFiles('Dockerfile', 'pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-docker-
+
+      - name: Build app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: mlh_pe_url_shortener-app:latest
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+      - name: Start services
+        env:
+          RESEND_API_KEY: ""
+          ALERT_EMAIL_TO: ""
+        run: docker compose up -d --wait
+
+      - name: Wait for healthy stack
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:80/health > /dev/null 2>&1; then
+              echo "Stack is healthy"
+              exit 0
+            fi
+            echo "Waiting for stack... ($i/30)"
+            sleep 2
+          done
+          echo "Stack failed to become healthy"
+          docker compose logs
+          exit 1
+
+      - name: Cache k6 binary
+        id: k6-cache
+        uses: actions/cache@v4
+        with:
+          path: /usr/bin/k6
+          key: ${{ runner.os }}-k6-latest
+
+      - name: Install k6
+        if: steps.k6-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL https://dl.k6.io/key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/k6-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+      - name: Load test (500 VUs)
+        run: k6 run --env BASE_URL=http://localhost:80 --summary-export=k6-summary.json loadtests/stress.js 2>&1 | tee k6-output.txt
+
+      - name: Post load test results to PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let summary = '';
+            try {
+              const raw = fs.readFileSync('k6-summary.json', 'utf8');
+              const data = JSON.parse(raw);
+              const m = data.metrics;
+
+              const fmt = (v) => v !== undefined ? v.toFixed(2) : 'N/A';
+              const dur = m.http_req_duration || {};
+              const reqs = m.http_reqs || {};
+              const fails = m.http_req_failed || {};
+              const iters = m.iterations || {};
+
+              summary = [
+                '## Load Test Results',
+                '',
+                '| Metric | Value |',
+                '|--------|-------|',
+                `| **Total Requests** | ${fmt(reqs.count)} |`,
+                `| **Request Rate** | ${fmt(reqs.rate)} req/s |`,
+                `| **Avg Response Time** | ${fmt(dur.avg)} ms |`,
+                `| **p50 Response Time** | ${fmt(dur.med)} ms |`,
+                `| **p90 Response Time** | ${fmt(dur['p(90)'])} ms |`,
+                `| **p95 Response Time** | ${fmt(dur['p(95)'])} ms |`,
+                `| **Max Response Time** | ${fmt(dur.max)} ms |`,
+                `| **Error Rate** | ${fmt((fails.rate || 0) * 100)}% |`,
+                `| **Total Iterations** | ${fmt(iters.count)} |`,
+                '',
+                '<details><summary>Full k6 output</summary>',
+                '',
+                '```',
+                fs.readFileSync('k6-output.txt', 'utf8').slice(-3000),
+                '```',
+                '</details>',
+              ].join('\n');
+            } catch (e) {
+              summary = [
+                '## Load Test Results',
+                '',
+                '> Failed to parse k6 summary JSON.',
+                '',
+                '<details><summary>Full k6 output</summary>',
+                '',
+                '```',
+                fs.existsSync('k6-output.txt') ? fs.readFileSync('k6-output.txt', 'utf8').slice(-3000) : 'No output captured.',
+                '```',
+                '</details>',
+              ].join('\n');
+            }
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body.includes('## Load Test Results'));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: summary,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: summary,
+              });
+            }
+
+      - name: Upload k6 results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results
+          path: |
+            k6-summary.json
+            k6-output.txt
+
+      - name: Collect logs on failure
+        if: failure()
+        run: docker compose logs --tail=100
