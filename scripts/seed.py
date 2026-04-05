@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Seed the database with CSV data from the data/ directory."""
+
 import csv
 import datetime
 import json
