@@ -160,7 +160,7 @@
         "parameters": [
           {"name": "user_id", "in": "query", "schema": {"type": "integer"}, "description": "Filter by owner user ID"},
           {"name": "is_active", "in": "query", "schema": {"type": "string", "enum": ["true", "false"]}, "description": "Filter by active status"},
-          {"name": "cursor", "in": "query", "schema": {"type": "integer"}, "description": "ID of the last item from the previous page (cursor-based pagination)"},
+          {"name": "page_num", "in": "query", "schema": {"type": "integer"}, "description": "ID of the last item from the previous page (cursor-based pagination)"},
           {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 100}, "description": "Number of results per page"}
         ],
         "responses": {

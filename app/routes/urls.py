@@ -17,7 +17,7 @@ urls_bp = Blueprint("urls", __name__)
 def list_urls():
     query = Url.select().order_by(Url.id)
 
-    cursor = request.args.get("cursor", type=int)
+    cursor = request.args.get("page_num", type=int)
     if cursor is not None:
         query = query.where(Url.id > cursor)
 
@@ -110,7 +110,7 @@ def get_url(url_id):
     checkpoint("db_read")
 
     data = url.to_dict()
-    cache_set(f"url:{url_id}", data, ttl=300)
+    cache_set(f"url:{url_id}", data)
     checkpoint("cache_set")
     return jsonify(data)
 
@@ -178,7 +178,7 @@ def redirect_short_code(short_code):
         "original_url": url.original_url,
         "is_active": url.is_active,
     }
-    cache_set(f"redir:{short_code}", redir_data, ttl=300)
+    cache_set(f"redir:{short_code}", redir_data)
 
     if not url.is_active:
         return jsonify(error="URL is deactivated"), 410

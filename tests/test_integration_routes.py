@@ -463,25 +463,25 @@ class TestUrlFilters:
         assert url2["id"] in ids
         assert url1["id"] not in ids
 
-    def test_cursor_returns_ids_greater_than_n(self, client):
+    def test_page_num_returns_ids_greater_than_n(self, client):
         user = _make_user(client)
         url1 = _make_url(client, user["id"], title="first")
         url2 = _make_url(client, user["id"], title="second")
         url3 = _make_url(client, user["id"], title="third")
-        filtered = client.get(f"/urls?cursor={url1['id']}").get_json()
+        filtered = client.get(f"/urls?page_num={url1['id']}").get_json()
         ids = [u["id"] for u in filtered]
         assert url1["id"] not in ids
         assert url2["id"] in ids
         assert url3["id"] in ids
 
-    def test_cursor_with_per_page_limits_results(self, client):
+    def test_page_num_with_per_page_limits_results(self, client):
         user = _make_user(client)
         _make_url(client, user["id"], title="a")
         _make_url(client, user["id"], title="b")
         _make_url(client, user["id"], title="c")
         all_urls = client.get("/urls").get_json()
         first_id = all_urls[0]["id"]
-        filtered = client.get(f"/urls?cursor={first_id}&per_page=1").get_json()
+        filtered = client.get(f"/urls?page_num={first_id}&per_page=1").get_json()
         assert len(filtered) == 1
 
 
