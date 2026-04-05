@@ -1,5 +1,3 @@
-import datetime
-
 from peewee import (
     AutoField,
     BooleanField,
@@ -9,12 +7,8 @@ from peewee import (
     TextField,
 )
 
-from app.database import BaseModel
+from app.database import BaseModel, utcnow
 from app.models.user import User
-
-
-def _utcnow():
-    return datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
 
 
 class Url(BaseModel):
@@ -24,8 +18,8 @@ class Url(BaseModel):
     original_url = TextField()
     title = CharField(max_length=500)
     is_active = BooleanField(default=True)
-    created_at = DateTimeField(default=_utcnow)
-    updated_at = DateTimeField(default=_utcnow)
+    created_at = DateTimeField(default=utcnow)
+    updated_at = DateTimeField(default=utcnow)
 
     class Meta:
         table_name = "urls"

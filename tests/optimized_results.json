@@ -1,0 +1,271 @@
+{
+  "timestamp": "2026-04-04T21:09:44",
+  "config": {
+    "seed_users": 50,
+    "seed_urls_per_user": 4,
+    "iterations": 200,
+    "warmup": 10
+  },
+  "results": [
+    {
+      "name": "health",
+      "method": "GET",
+      "path": "/health",
+      "iterations": 200,
+      "wall_time_s": 0.0496,
+      "throughput_rps": 4028.73,
+      "latency_ms": {
+        "avg": 0.246,
+        "p50": 0.218,
+        "p95": 0.402,
+        "p99": 0.59,
+        "min": 0.201,
+        "max": 0.707,
+        "stdev": 0.073
+      },
+      "status_codes": {
+        "200": 200
+      }
+    },
+    {
+      "name": "health_ready",
+      "method": "GET",
+      "path": "/health/ready",
+      "iterations": 200,
+      "wall_time_s": 0.077,
+      "throughput_rps": 2597.73,
+      "latency_ms": {
+        "avg": 0.382,
+        "p50": 0.349,
+        "p95": 0.592,
+        "p99": 0.912,
+        "min": 0.278,
+        "max": 1.012,
+        "stdev": 0.11
+      },
+      "status_codes": {
+        "200": 200
+      }
+    },
+    {
+      "name": "list_users",
+      "method": "GET",
+      "path": "/users",
+      "iterations": 200,
+      "wall_time_s": 0.1404,
+      "throughput_rps": 1424.18,
+      "latency_ms": {
+        "avg": 0.7,
+        "p50": 0.675,
+        "p95": 0.849,
+        "p99": 1.126,
+        "min": 0.596,
+        "max": 1.311,
+        "stdev": 0.099
+      },
+      "status_codes": {
+        "200": 200
+      }
+    },
+    {
+      "name": "get_user",
+      "method": "GET",
+      "path": "/users/1",
+      "iterations": 200,
+      "wall_time_s": 0.1169,
+      "throughput_rps": 1711.48,
+      "latency_ms": {
+        "avg": 0.582,
+        "p50": 0.556,
+        "p95": 0.729,
+        "p99": 0.95,
+        "min": 0.481,
+        "max": 1.002,
+        "stdev": 0.085
+      },
+      "status_codes": {
+        "200": 200
+      }
+    },
+    {
+      "name": "create_user",
+      "method": "POST",
+      "path": "/users",
+      "iterations": 200,
+      "wall_time_s": 0.1868,
+      "throughput_rps": 1070.51,
+      "latency_ms": {
+        "avg": 0.933,
+        "p50": 0.889,
+        "p95": 1.266,
+        "p99": 1.572,
+        "min": 0.654,
+        "max": 1.738,
+        "stdev": 0.184
+      },
+      "status_codes": {
+        "201": 200
+      }
+    },
+    {
+      "name": "list_urls",
+      "method": "GET",
+      "path": "/urls",
+      "iterations": 200,
+      "wall_time_s": 0.4106,
+      "throughput_rps": 487.11,
+      "latency_ms": {
+        "avg": 2.05,
+        "p50": 1.928,
+        "p95": 2.849,
+        "p99": 4.331,
+        "min": 1.651,
+        "max": 5.982,
+        "stdev": 0.501
+      },
+      "status_codes": {
+        "200": 200
+      }
+    },
+    {
+      "name": "list_urls_filtered",
+      "method": "GET",
+      "path": "/urls?user_id=1",
+      "iterations": 200,
+      "wall_time_s": 0.1717,
+      "throughput_rps": 1165.12,
+      "latency_ms": {
+        "avg": 0.856,
+        "p50": 0.789,
+        "p95": 1.328,
+        "p99": 1.563,
+        "min": 0.613,
+        "max": 1.74,
+        "stdev": 0.214
+      },
+      "status_codes": {
+        "200": 200
+      }
+    },
+    {
+      "name": "get_url",
+      "method": "GET",
+      "path": "/urls/1",
+      "iterations": 200,
+      "wall_time_s": 0.1374,
+      "throughput_rps": 1455.12,
+      "latency_ms": {
+        "avg": 0.685,
+        "p50": 0.644,
+        "p95": 0.947,
+        "p99": 1.295,
+        "min": 0.53,
+        "max": 1.362,
+        "stdev": 0.14
+      },
+      "status_codes": {
+        "200": 200
+      }
+    },
+    {
+      "name": "create_url",
+      "method": "POST",
+      "path": "/urls",
+      "iterations": 200,
+      "wall_time_s": 0.3722,
+      "throughput_rps": 537.4,
+      "latency_ms": {
+        "avg": 1.86,
+        "p50": 1.455,
+        "p95": 4.218,
+        "p99": 12.419,
+        "min": 1.105,
+        "max": 16.667,
+        "stdev": 1.794
+      },
+      "status_codes": {
+        "201": 200
+      }
+    },
+    {
+      "name": "update_url",
+      "method": "PUT",
+      "path": "/urls/1",
+      "iterations": 200,
+      "wall_time_s": 0.588,
+      "throughput_rps": 340.16,
+      "latency_ms": {
+        "avg": 2.935,
+        "p50": 1.633,
+        "p95": 8.588,
+        "p99": 24.585,
+        "min": 1.076,
+        "max": 25.322,
+        "stdev": 4.39
+      },
+      "status_codes": {
+        "200": 200
+      }
+    },
+    {
+      "name": "list_events",
+      "method": "GET",
+      "path": "/events",
+      "iterations": 200,
+      "wall_time_s": 0.9974,
+      "throughput_rps": 200.52,
+      "latency_ms": {
+        "avg": 4.978,
+        "p50": 2.598,
+        "p95": 11.635,
+        "p99": 32.849,
+        "min": 1.641,
+        "max": 138.876,
+        "stdev": 11.66
+      },
+      "status_codes": {
+        "200": 200
+      }
+    },
+    {
+      "name": "update_user",
+      "method": "PUT",
+      "path": "/users/1",
+      "iterations": 200,
+      "wall_time_s": 2.1958,
+      "throughput_rps": 91.08,
+      "latency_ms": {
+        "avg": 10.958,
+        "p50": 5.086,
+        "p95": 42.002,
+        "p99": 82.431,
+        "min": 1.457,
+        "max": 182.105,
+        "stdev": 18.959
+      },
+      "status_codes": {
+        "200": 200
+      }
+    },
+    {
+      "name": "bulk_import_100rows",
+      "method": "POST",
+      "path": "/users/bulk",
+      "iterations": 20,
+      "wall_time_s": 1.2633,
+      "throughput_rps": 15.83,
+      "latency_ms": {
+        "avg": 63.164,
+        "p50": 40.446,
+        "p95": 209.199,
+        "p99": 261.209,
+        "min": 14.634,
+        "max": 274.212,
+        "stdev": 66.088
+      },
+      "status_codes": {
+        "200": 20
+      }
+    }
+  ]
+}

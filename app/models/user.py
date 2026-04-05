@@ -1,19 +1,13 @@
-import datetime
-
 from peewee import AutoField, CharField, DateTimeField
 
-from app.database import BaseModel
-
-
-def _utcnow():
-    return datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
+from app.database import BaseModel, utcnow
 
 
 class User(BaseModel):
     id = AutoField()
     username = CharField(unique=True, max_length=150)
     email = CharField(unique=True, max_length=255)
-    created_at = DateTimeField(default=_utcnow)
+    created_at = DateTimeField(default=utcnow)
 
     class Meta:
         table_name = "users"
