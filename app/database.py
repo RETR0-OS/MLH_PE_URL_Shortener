@@ -28,6 +28,13 @@ def _create_database(max_connections=20):
         max_connections=max_connections,
         stale_timeout=300,
         timeout=10,
+        # Keep TCP connections alive through Docker NAT (which drops idle
+        # connections after ~600s). Start probing after 60s of idle,
+        # retry every 10s, give up after 5 failures.
+        keepalives=1,
+        keepalives_idle=60,
+        keepalives_interval=10,
+        keepalives_count=5,
     )
 
 
