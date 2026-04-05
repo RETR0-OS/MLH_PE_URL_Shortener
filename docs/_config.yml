@@ -1,0 +1,18 @@
+title: MLH PE URL Shortener
+description: Production-grade URL shortener — MLH PE Hackathon
+url: "https://retr0-os.github.io"
+baseurl: "/MLH_PE_URL_Shortener"
+
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+plugins:
+  - jekyll-relative-links
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
