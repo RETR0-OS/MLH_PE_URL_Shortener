@@ -437,16 +437,16 @@ Your hardware has **4 GB RAM** total; ~3.3 GB available for services.
 | Postgres | 768 MB | Fixed 1 instance |
 | Redis | 160 MB | Fixed 1 instance |
 | Nginx | 64 MB | Fixed 1 instance |
-| Prometheus | 256 MB | Fixed 1 instance |
+| Prometheus | 512 MB | Fixed 1 instance |
 | Loki | 256 MB | Fixed 1 instance |
 | Grafana | 256 MB | Fixed 1 instance |
 | Alertmanager | 128 MB | Fixed 1 instance |
 
-**Formula**: `Total = (app_replicas * 384MB) + 1920MB (fixed services)`
+**Formula**: `Total = (app_replicas * 384MB) + 2176MB (fixed services)`
 
-- **2 replicas**: ~2.66 GB (safe, 36% headroom)
-- **3 replicas**: ~3.04 GB (safe, 8% headroom)
-- **4 replicas**: ~3.4 GB (OUT OF MEMORY, don't do this)
+- **2 replicas**: ~2.92 GB (safe, 12% headroom)
+- **3 replicas**: ~3.30 GB (tight, ~0% headroom)
+- **4 replicas**: ~3.7 GB (OUT OF MEMORY, don't do this)
 
 **Action**: If memory usage >3 GB, scale app down to 1 replica or restart services.
 

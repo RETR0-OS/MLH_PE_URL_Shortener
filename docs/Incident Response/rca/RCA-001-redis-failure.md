@@ -18,7 +18,7 @@ Redis process stopped unexpectedly at 14:32 UTC. Circuit breaker detected the fa
 
 ### Alert Fired
 
-**Alert Name:** `RedisConnectionFailure`
+**Alert Name:** `RedisDown`
 **Firing Time:** 14:32:03 UTC
 **Detection Latency:** 0.5s from failure injection
 
@@ -39,14 +39,14 @@ On-call engineer opens the **"URL Shortener - Golden Signals"** Grafana dashboar
 
 #### Panel 1: Request Rate (Traffic)
 
-**PromQL:** `sum(rate(flask_http_request_total[1m])) by (method)`
+**PromQL:** `sum(rate(flask_http_request_total[5m])) by (method)`
 
 **Observation:**
 The traffic pattern is flat and unaffected. GET and POST request rates remain stable at ~100 req/s and ~15 req/s respectively. No traffic surge or loss. This rules out a traffic-based outage.
 
 #### Panel 2: Error Rate 5xx %
 
-**PromQL:** `rate(5xx) / rate(total) * 100`
+**PromQL:** `sum(rate(flask_http_request_total{status=~"5.."}[5m])) / sum(rate(flask_http_request_total[5m])) * 100`
 
 **Observation:**
 Error rate remains at 0%. Despite Redis being down, the application continues returning HTTP 200 responses. This is the first indication that graceful fallback is working. Without a fallback mechanism, we would expect a sharp spike in 5xx errors here.
@@ -55,7 +55,7 @@ Error rate remains at 0%. Despite Redis being down, the application continues re
 
 **PromQL for p95:**
 ```promql
-histogram_quantile(0.95, rate(flask_http_request_duration_seconds_bucket[5m]))
+histogram_quantile(0.95, sum(rate(flask_http_request_duration_seconds_bucket[5m])) by (le))
 ```
 
 **Observation:**
@@ -93,7 +93,7 @@ All three app replicas log the same message at approximately the same time, indi
 **Panel:** Active Alerts
 
 **Observation:**
-`RedisUp` alert is firing (Redis is down). `RedisMemoryUsage` and `RedisConnections` alerts are not firing — they cannot fire because Redis is unreachable.
+`RedisDown` alert is firing (Redis is down). `RedisMemoryUsage` and `RedisConnections` alerts are not firing — they cannot fire because Redis is unreachable.
 
 Docker events confirm:
 ```
@@ -110,7 +110,7 @@ The structured log shows a single `WARNING: Redis unavailable` message per repli
 
 **Panel 5: CPU Usage**
 
-**PromQL:** `rate(process_cpu_seconds_total{job="app"}[1m]) * 100`
+**PromQL:** `rate(process_cpu_seconds_total{job="app"}[5m]) * 100`
 
 **Observation:**
 CPU usage increased slightly from ~5% to ~12% per replica due to the increased database load (now serving cache misses directly). Still far below the 75% SLO threshold. Postgres CPU also spiked from ~8% to ~18% for the same reason.
@@ -227,7 +227,7 @@ Recovery time: ~15 seconds (container startup + volume remount).
 
 2. **Graceful degradation was transparent.** The application continued serving reads from PostgreSQL without any code changes or manual intervention.
 
-3. **Monitoring caught the problem immediately.** The `RedisConnectionFailure` alert fired within 0.5s of failure.
+3. **Monitoring caught the problem immediately.** The `RedisDown` alert fired within 0.5s of failure.
 
 4. **Multi-layered resilience.** Even if the circuit breaker had failed, Nginx would have retried requests on healthy replicas and Postgres would have handled the load.
 
@@ -270,7 +270,7 @@ Recovery time: ~15 seconds (container startup + volume remount).
 
 ### Relevant Links
 
-- **Grafana Dashboard:** [URL Shortener - Golden Signals](http://localhost:3000/d/golden-signals)
+- **Grafana Dashboard:** [URL Shortener - Golden Signals](http://localhost:3000/d/url-shortener-golden)
 - **Prometheus Rules:** `/monitoring/prometheus/alerts.yml`
 - **Circuit Breaker Implementation:** `/app/utils/cache.py` (lines 17-51 for `get_redis()`, lines 59-62 for `_open_circuit()`)
 - **Docker Compose:** `/docker-compose.yml` (Redis service definition)
@@ -279,16 +279,16 @@ Recovery time: ~15 seconds (container startup + volume remount).
 
 ```promql
 # Traffic baseline
-sum(rate(flask_http_request_total[1m])) by (method)
+sum(rate(flask_http_request_total[5m])) by (method)
 
 # Error rate
-rate(5xx) / rate(total) * 100
+sum(rate(flask_http_request_total{status=~"5.."}[5m])) / sum(rate(flask_http_request_total[5m])) * 100
 
 # Latency p95
-histogram_quantile(0.95, rate(flask_http_request_duration_seconds_bucket[5m]))
+histogram_quantile(0.95, sum(rate(flask_http_request_duration_seconds_bucket[5m])) by (le))
 
 # Redis connection errors
-rate(redis_connection_errors_total[1m])
+increase(redis_connection_errors_total[1m])
 
 # Redis uptime
 up{job="redis"}
