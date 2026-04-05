@@ -219,6 +219,7 @@ The rubric asked for a health endpoint, some tests, and a restart policy. We tre
 
 | What | One line |
 |---|---|
+| **CD pipeline — auto-deploy on merge** | [`deploy.yml`](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/blob/dev/.github/workflows/deploy.yml) SSHs into the DigitalOcean droplet, rebuilds containers, and health-checks the app — no manual deploy steps |
 | **k6 in CI on every PR** | [`load-tests.yml`](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/blob/dev/.github/workflows/load-tests.yml) fires 500 VUs at the full stack before any merge; results posted as a bot comment |
 | **Automated chaos script** | [`chaos-test.sh`](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/blob/dev/incident-response/chaos/chaos-test.sh) runs inject → alert → restore → verify with no manual steps; exits non-zero if anything times out |
 | **Nginx load-balancing across 2 live replicas** | One container dying drops zero requests — Nginx routes around it while Docker restarts the failed one |
@@ -226,7 +227,6 @@ The rubric asked for a health endpoint, some tests, and a restart policy. We tre
 | **91% coverage — 21 pts above Gold** | Dedicated gap tests cover the error handler branches (503, 405, 500) that happy-path tests miss |
 | **N+1 query detection as a CI gate** | [`test_performance.py`](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/blob/dev/tests/test_performance.py) counts SELECT statements per endpoint; lazy-loading bugs fail the PR before they ship |
 | **`start-first` rolling deploys** | New replica is healthy and serving before the old one stops; zero-downtime by default |
-| **CD pipeline — auto-deploy on merge** | [`deploy.yml`](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/blob/dev/.github/workflows/deploy.yml) SSHs into the DigitalOcean droplet, rebuilds containers, and health-checks the app — no manual deploy steps |
 | **Alertmanager → Discord + email** | Two independent channels; alert latency under 90 s from failure to notification |
 | **OpenTelemetry + Jaeger tracing** | Trace ID flows Nginx → app → DB on every request; slow spans visible in Jaeger without guessing |
 | **Loki + Promtail log aggregation** | Logs queryable in Grafana by level, endpoint, or trace ID — no SSH required |
