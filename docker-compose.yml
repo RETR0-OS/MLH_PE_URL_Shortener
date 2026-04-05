@@ -210,6 +210,7 @@ services:
     environment:
       RESEND_API_KEY: "${RESEND_API_KEY:-}"
       ALERT_EMAIL_TO: "${ALERT_EMAIL_TO:-teamasdaa@gmail.com}"
+      DISCORD_WEBHOOK_URL: "${DISCORD_WEBHOOK_URL:-}"
     restart: unless-stopped
     deploy:
       resources:
@@ -229,6 +230,21 @@ services:
       resources:
         limits:
           memory: 256M
+
+  promtail:
+    image: grafana/promtail:latest
+    volumes:
+      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
   grafana:
     image: grafana/grafana:latest

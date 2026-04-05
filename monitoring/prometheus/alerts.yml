@@ -43,8 +43,8 @@ groups:
   - name: scaling_alerts
     rules:
       - alert: HighReplicaCount
-        expr: count(up{job="app"}) > 2
-        for: 10s
+        expr: count(up{job="app"}) > 3
+        for: 2m
         labels:
           severity: warning
         annotations:
@@ -52,19 +52,19 @@ groups:
           description: "Running {{ $value }} replicas (baseline is 2). Autoscaler has kicked in due to high load."
 
       - alert: HighRequestRate
-        expr: sum(rate(flask_http_request_total[1m])) > 50
-        for: 30s
+        expr: sum(rate(flask_http_request_total[1m])) > 400
+        for: 1m
         labels:
           severity: warning
         annotations:
           summary: "Unusually high request rate"
-          description: "Request rate is {{ $value | printf \"%.0f\" }} req/s, which exceeds the 50 req/s threshold."
+          description: "Request rate is {{ $value | printf \"%.0f\" }} req/s, which exceeds the 200 req/s threshold."
 
       - alert: HighMemoryUsage
-        expr: process_resident_memory_bytes{job="app"} > 100 * 1024 * 1024
-        for: 30s
+        expr: process_resident_memory_bytes{job="app"} > 256 * 1024 * 1024
+        for: 2m
         labels:
           severity: warning
         annotations:
           summary: "High memory usage on {{ $labels.instance }}"
-          description: "Instance {{ $labels.instance }} is using {{ $value | humanize }}B of RSS memory (threshold: 100MB)."
+          description: "Instance {{ $labels.instance }} is using {{ $value | humanize }}B of RSS memory (threshold: 256MB)."
