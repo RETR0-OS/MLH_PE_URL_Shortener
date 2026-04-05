@@ -93,11 +93,11 @@ curl -s http://localhost:5000/metrics    # Prometheus metrics
 |-------|--------|--------|
 | Service Uptime | Availability | `up{job="app"}` |
 | Active Alerts | Alerts | `count(ALERTS{alertstate="firing"})` |
-| Request Rate | Traffic | `sum(rate(flask_http_request_total[1m])) by (method)` |
-| Error Rate (5xx %) | Errors | `rate(5xx) / rate(total) * 100` |
-| Latency p50/p95/p99 | Latency | `histogram_quantile(0.X, ...)` |
+| Request Rate | Traffic | `sum(rate(flask_http_request_total[5m])) by (method)` |
+| Error Rate (5xx %) | Errors | `sum(rate(flask_http_request_total{status=~"5.."}[5m])) / sum(rate(flask_http_request_total[5m])) * 100` |
+| Latency p50/p95/p99 | Latency | `histogram_quantile(0.X, sum(rate(flask_http_request_duration_seconds_bucket[5m])) by (le))` |
 | Memory Usage | Saturation | `process_resident_memory_bytes` |
-| CPU Usage | Saturation | `rate(process_cpu_seconds_total[1m]) * 100` |
+| CPU Usage | Saturation | `rate(process_cpu_seconds_total{job="app"}[5m]) * 100` |
 | Application Logs | Investigation | Loki: `{job="app"}` |
 
 ---
@@ -127,7 +127,13 @@ docs/Incident Response/
 ├── runbooks/
 │   └── INCIDENT-PLAYBOOK.md        # Master incident response playbook
 └── screenshots/
-    └── .gitkeep                     # Submission screenshots go here
+    ├── metrics-endpoint.png            # /metrics endpoint output
+    ├── prometheus-alert-rules.png      # Prometheus alert rules page
+    ├── alertmanager-ui.png             # Alertmanager UI
+    ├── alertmanager-config.png         # Alertmanager configuration/status
+    ├── grafana-golden-signals-dashboard.png  # Grafana Golden Signals dashboard
+    ├── grafana-loki-logs.png           # Grafana Loki log exploration
+    └── jaeger-tracing.png              # Jaeger distributed tracing UI
 
 scripts/
 └── chaos-test.sh                    # Automated failure injection + alert verification

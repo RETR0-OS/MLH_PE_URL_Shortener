@@ -10,11 +10,12 @@ This document records every design decision made for Track 3 (Incident Response)
 ## Table of Contents
 
 1. [Evidence Summary by Submission Field](#evidence-summary-by-submission-field)
-2. [Bronze Tier Decisions](#bronze-tier-decisions)
-3. [Silver Tier Decisions](#silver-tier-decisions)
-4. [Gold Tier Decisions](#gold-tier-decisions)
-5. [Architecture Overview](#architecture-overview)
-6. [Known Gaps](#known-gaps)
+2. [Visual Evidence (Screenshots)](#visual-evidence-screenshots)
+3. [Bronze Tier Decisions](#bronze-tier-decisions)
+4. [Silver Tier Decisions](#silver-tier-decisions)
+5. [Gold Tier Decisions](#gold-tier-decisions)
+6. [Architecture Overview](#architecture-overview)
+7. [Known Gaps](#known-gaps)
 
 ---
 
@@ -43,6 +44,22 @@ This document records every design decision made for Track 3 (Incident Response)
 | Dashboard evidence covers latency, traffic, errors, and saturation | Grafana dashboard "URL Shortener - Golden Signals" (UID: `url-shortener-golden`) has 8 panels: Service Uptime (availability), Active Alerts, Request Rate (traffic by HTTP method), Error Rate 5xx % (errors), Latency p50/p95/p99 (latency), Memory Usage RSS (saturation), CPU Usage % (saturation), Application Logs (Loki). Auto-refresh every 10s, alert annotations overlay. | `monitoring/grafana/dashboards/url-shortener.json` (189 lines), `monitoring/grafana/provisioning/datasources/datasources.yml`, `monitoring/grafana/provisioning/dashboards/dashboards.yml` |
 | Runbook includes actionable alert-response procedures | `INCIDENT-PLAYBOOK.md` is a 640-line, 20-section operational playbook covering severity definitions, per-alert remediation commands (ServiceDown, HighErrorRate, HighLatency, RedisDown), SLO targets, escalation paths, communication templates, on-call handoff procedures, and troubleshooting decision trees. | `docs/Incident Response/runbooks/INCIDENT-PLAYBOOK.md`, `docs/Incident Response/README.md` |
 | Root-cause analysis of a simulated incident is documented | `RCA-001-redis-failure.md` documents a Redis OOMKill incident using the Grafana dashboard. Walks through 5 specific dashboard panels, includes Loki log queries (`{job="app"} |= "Redis unavailable"`), traces the circuit breaker activation in `app/utils/cache.py`, and records timeline, impact, and resolution. A reusable `POSTMORTEM-TEMPLATE.md` (Google SRE 5-Whys format) is also provided. | `docs/Incident Response/rca/RCA-001-redis-failure.md` (356 lines), `docs/Incident Response/rca/POSTMORTEM-TEMPLATE.md` (271 lines) |
+
+---
+
+## Visual Evidence (Screenshots)
+
+All screenshots are located in [`docs/Incident Response/screenshots/`](screenshots/) and demonstrate the live monitoring stack with real traffic data.
+
+| Screenshot | Proves | Relevant Sections |
+|---|---|---|
+| [`metrics-endpoint.png`](screenshots/metrics-endpoint.png) | `/metrics` endpoint returns Prometheus metrics (`flask_http_request_total`, `flask_http_request_duration_seconds_bucket`, `process_resident_memory_bytes`, etc.) | [Decision B4](#decision-b4-prometheus-flask-exporter-for-metrics), Bronze evidence row 2 |
+| [`prometheus-alert-rules.png`](screenshots/prometheus-alert-rules.png) | 7 alert rules configured in Prometheus (ServiceDown, HighErrorRate, HighLatency, RedisDown, HighReplicaCount, HighRequestRate, HighMemoryUsage) | [Decision S1](#decision-s1-prometheus--alertmanager-over-grafana-alerting), Silver evidence row 1 |
+| [`alertmanager-ui.png`](screenshots/alertmanager-ui.png) | Alertmanager is running and processing alerts with severity-based routing | [Decision S2](#decision-s2-email-via-resend-smtp-as-primary-notification-channel), Silver evidence row 2 |
+| [`alertmanager-config.png`](screenshots/alertmanager-config.png) | Alertmanager configuration with email receivers (Resend SMTP), `group_wait: 0s` for critical, `group_wait: 10s` for warnings | [Decision S4](#decision-s4-alert-timing-tuned-for-sub-5-minute-delivery), Silver evidence row 3 |
+| [`grafana-golden-signals-dashboard.png`](screenshots/grafana-golden-signals-dashboard.png) | Grafana "Golden Signals" dashboard with 8 panels: Uptime, Active Alerts, Request Rate, Error Rate, Latency p50/p95/p99, Memory RSS, CPU %, Application Logs — all showing live data | [Decision G1](#decision-g1-single-golden-signals-dashboard-with-8-panels), Gold evidence row 1 |
+| [`grafana-loki-logs.png`](screenshots/grafana-loki-logs.png) | Centralized log viewing via Grafana + Loki without SSH — structured JSON logs queryable with `{job="app"}` | [Decision B5](#decision-b5-loki--promtail-for-ssh-free-log-inspection), Bronze evidence row 3 |
+| [`jaeger-tracing.png`](screenshots/jaeger-tracing.png) | Distributed tracing via Jaeger + OpenTelemetry showing request traces across services | [Architecture Overview](#architecture-overview), supplementary tracing evidence |
 
 ---
 
@@ -99,6 +116,8 @@ This document records every design decision made for Track 3 (Incident Response)
 
 **Implementation:** `app/__init__.py` (lines 5, 12, 43, 84, 90, 95)
 
+> **Visual evidence:** [`metrics-endpoint.png`](screenshots/metrics-endpoint.png) — shows the live `/metrics` endpoint output with `flask_http_request_total`, `flask_http_request_duration_seconds_bucket`, and process metrics.
+
 ### Decision B5: Loki + Promtail for SSH-free log inspection
 
 **Choice:** Grafana Loki for log aggregation, Promtail for log shipping, Grafana for the viewing UI.
@@ -117,7 +136,9 @@ This document records every design decision made for Track 3 (Incident Response)
 - `monitoring/loki/loki-config.yml` — TSDB storage, v13 schema, filesystem backend.
 - `monitoring/promtail/promtail-config.yml` — Docker SD, filters to `app` containers, pushes to Loki.
 - `monitoring/grafana/dashboards/url-shortener.json` (lines 162-177) — "Application Logs" panel querying `{job="app"}`.
-- `monitoring/grafana/provisioning/datasources/datasources.yml` (lines 11-15) — Loki datasource.
+- `monitoring/grafana/provisioning/datasources/datasources.yml` (lines 11-17) — Loki datasource.
+
+> **Visual evidence:** [`grafana-loki-logs.png`](screenshots/grafana-loki-logs.png) — shows the Grafana Explore view querying Loki with `{job="app"}`, displaying structured JSON application logs without SSH access.
 
 ---
 
@@ -136,6 +157,8 @@ This document records every design decision made for Track 3 (Incident Response)
 - `monitoring/prometheus/prometheus.yml` (lines 5-11) — `rule_files` + `alertmanagers` config.
 - `monitoring/prometheus/alerts.yml` — 7 rules across 2 groups.
 - `monitoring/alertmanager/alertmanager.yml` — Routing tree with severity-based receiver selection.
+
+> **Visual evidence:** [`prometheus-alert-rules.png`](screenshots/prometheus-alert-rules.png) — shows all 7 alert rules loaded in Prometheus with their expressions and `for` durations.
 
 ### Decision S2: Email (via Resend SMTP) as primary notification channel
 
@@ -156,6 +179,8 @@ This document records every design decision made for Track 3 (Incident Response)
 - `monitoring/alertmanager/alertmanager.yml` (lines 3-6) — SMTP global config.
 - Two receivers: `email-critical` (lines 22-56), `email-warnings` (lines 58-91).
 - Critical alerts: `group_wait: 0s`, `repeat_interval: 15m`. Warnings: `group_wait: 10s`, `repeat_interval: 1h`.
+
+> **Visual evidence:** [`alertmanager-ui.png`](screenshots/alertmanager-ui.png) — shows the Alertmanager UI with active routing. [`alertmanager-config.png`](screenshots/alertmanager-config.png) — shows the full Alertmanager configuration including SMTP settings, receivers, and group_wait timings.
 
 ### Decision S3: Discord as opt-in secondary channel
 
@@ -216,14 +241,16 @@ This document records every design decision made for Track 3 (Incident Response)
 | Golden Signal | Panel(s) | PromQL / Query |
 |---|---|---|
 | Latency | Latency p50/p95/p99 | `histogram_quantile(0.X, sum(rate(flask_http_request_duration_seconds_bucket[5m])) by (le))` |
-| Traffic | Request Rate (req/s) | `sum(rate(flask_http_request_total[1m])) by (method)` |
-| Errors | Error Rate (5xx %) | `sum(rate(flask_http_request_total{status=~"5.."}[2m])) / sum(rate(flask_http_request_total[2m])) * 100` |
-| Saturation | Memory Usage (RSS), CPU Usage (%) | `process_resident_memory_bytes`, `rate(process_cpu_seconds_total{job="app"}[1m]) * 100` |
+| Traffic | Request Rate (req/s) | `sum(rate(flask_http_request_total[5m])) by (method)` |
+| Errors | Error Rate (5xx %) | `sum(rate(flask_http_request_total{status=~"5.."}[5m])) / sum(rate(flask_http_request_total[5m])) * 100` |
+| Saturation | Memory Usage (RSS), CPU Usage (%) | `process_resident_memory_bytes`, `rate(process_cpu_seconds_total{job="app"}[5m]) * 100` |
 | Availability | Service Uptime | `up{job="app"}` |
 | Operational | Active Alerts | `count(ALERTS{alertstate="firing"}) OR vector(0)` |
 | Investigation | Application Logs | Loki: `{job="app"}` |
 
 **Implementation:** `monitoring/grafana/dashboards/url-shortener.json`
+
+> **Visual evidence:** [`grafana-golden-signals-dashboard.png`](screenshots/grafana-golden-signals-dashboard.png) — shows the live dashboard with all 8 panels populated with real traffic data from k6 load testing (50 VUs, ~237 req/s).
 
 ### Decision G2: Grafana auto-provisioning via file-based providers
 
@@ -315,6 +342,8 @@ This document records every design decision made for Track 3 (Incident Response)
 4. App (stdout) → Docker json-file driver → Promtail → Loki: Container logs ingested with 5s refresh.
 5. Grafana → Prometheus + Loki: Dashboards query both datasources. Logs panel uses Loki, all other panels use Prometheus.
 6. App → Jaeger: OpenTelemetry traces exported via OTLP/gRPC.
+
+> **Visual evidence:** [`jaeger-tracing.png`](screenshots/jaeger-tracing.png) — shows the Jaeger UI with distributed traces from the URL Shortener service.
 
 ---
 

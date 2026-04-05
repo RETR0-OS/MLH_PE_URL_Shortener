@@ -196,6 +196,20 @@ The [`load-tests.yml`](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/blob/dev
 | N+1 query regression | [`test_performance.py`](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/blob/dev/tests/test_performance.py) catches it in CI pre-merge | PR blocked until fix |
 | One replica dies under load | Nginx upstream health check detects it | Docker restarts replica; Nginx adds it back once healthy |
 | Broken code in PR | `--cov-fail-under=70` + failing tests = failed check | Merge blocked; fix required |
+| Deploy fails health check | `deploy.yml` polls `/health` for 30 s; exits non-zero on timeout | Workflow fails, old containers keep running, team notified via GitHub Actions |
+
+### Continuous Deployment — Auto-Deploy on Merge to Main
+
+Every merge to `main` triggers the [`deploy.yml`](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/blob/dev/.github/workflows/deploy.yml) GitHub Actions workflow, which SSHs into the production DigitalOcean droplet and runs a full rebuild:
+
+1. **Pull latest** — `git pull origin main` on the droplet
+2. **Rebuild containers** — `docker compose up -d --build --remove-orphans` rebuilds only changed images
+3. **Health gate** — the workflow polls `GET /health` for up to 30 seconds; if the app doesn't come healthy, it dumps container logs and **fails the workflow**
+4. **Concurrency lock** — only one deploy runs at a time (`concurrency: deploy-production`), preventing race conditions from back-to-back merges
+
+The deploy pipeline uses GitHub Secrets for credentials (`DROPLET_IP`, `DROPLET_USER`, `DROPLET_PASS`) — no secrets are stored in the repository.
+
+Combined with Docker's `start-first` update policy, this gives us **zero-downtime continuous deployment**: new replicas are healthy and serving before old ones stop, and the CI gate ensures broken code never reaches `main` in the first place.
 
 ---
 
@@ -205,6 +219,8 @@ The rubric asked for a health endpoint, some tests, and a restart policy. We tre
 
 | What | One line |
 |---|---|
+| **CD pipeline — auto-deploy on merge** | [`deploy.yml`](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/blob/dev/.github/workflows/deploy.yml) SSHs into the DigitalOcean droplet, rebuilds containers, and health-checks the app — no manual deploy steps |
+| **PR checklist template** | Every PR must complete a [structured checklist](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/blob/dev/.github/pull_request_template.md) covering code quality, testing, CI gates, production impact, and docs before merge — nothing ships unchecked |
 | **k6 in CI on every PR** | [`load-tests.yml`](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/blob/dev/.github/workflows/load-tests.yml) fires 500 VUs at the full stack before any merge; results posted as a bot comment |
 | **Automated chaos script** | [`chaos-test.sh`](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/blob/dev/incident-response/chaos/chaos-test.sh) runs inject → alert → restore → verify with no manual steps; exits non-zero if anything times out |
 | **Nginx load-balancing across 2 live replicas** | One container dying drops zero requests — Nginx routes around it while Docker restarts the failed one |
@@ -216,3 +232,14 @@ The rubric asked for a health endpoint, some tests, and a restart policy. We tre
 | **OpenTelemetry + Jaeger tracing** | Trace ID flows Nginx → app → DB on every request; slow spans visible in Jaeger without guessing |
 | **Loki + Promtail log aggregation** | Logs queryable in Grafana by level, endpoint, or trace ID — no SSH required |
 | **Trivy CVE scanning on every image build** | Docker image scanned for known vulnerabilities before being pushed to GHCR |
+
+### Continuous Deployment
+
+The full CI/CD pipeline works as follows:
+
+1. **PR opened → `dev`** — unit tests (174, 91% coverage), load tests (500 VU k6), and ruff lint all run automatically; merge is blocked until all 3 pass
+2. **Merge to `main`** — [`deploy.yml`](https://github.com/RETR0-OS/MLH_PE_URL_Shortener/blob/dev/.github/workflows/deploy.yml) triggers, SSHs into the production DigitalOcean droplet, pulls the latest code, rebuilds Docker images, and polls `/health` until the app is confirmed healthy
+3. **Health gate** — if the app doesn't pass its health check within 30 seconds, the workflow fails and the old containers keep running
+4. **Concurrency lock** — only one deploy runs at a time, preventing race conditions from rapid merges
+
+Due to budget constraints, we run a single DigitalOcean droplet for production — there is no separate dev or staging VM. To compensate, the CI pipeline acts as our staging gate: every PR must pass the full test suite, load tests, and lint checks against a real Postgres + Redis stack inside GitHub Actions before code ever reaches the production server. This means broken code is caught before it touches the droplet, not after.
