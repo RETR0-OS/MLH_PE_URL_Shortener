@@ -162,7 +162,9 @@ def redirect_short_code(short_code):
     if cached is not None:
         if not cached["is_active"]:
             return jsonify(error="URL is deactivated"), 410
-        log_event(cached["id"], cached["user_id"], "redirect", {"short_code": short_code})
+        log_event(
+            cached["id"], cached["user_id"], "redirect", {"short_code": short_code}
+        )
         return redirect(cached["original_url"], code=302)
 
     try:
@@ -171,8 +173,10 @@ def redirect_short_code(short_code):
         return jsonify(error="Not found"), 404
 
     redir_data = {
-        "id": url.id, "user_id": url.user_id,
-        "original_url": url.original_url, "is_active": url.is_active,
+        "id": url.id,
+        "user_id": url.user_id,
+        "original_url": url.original_url,
+        "is_active": url.is_active,
     }
     cache_set(f"redir:{short_code}", redir_data, ttl=300)
 
